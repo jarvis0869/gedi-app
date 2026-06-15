@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { Fonts } from '@/constants/theme';
 
 interface Props {
   type: 'going' | 'nah' | null;
@@ -8,16 +9,19 @@ interface Props {
 }
 
 export function StampOverlay({ type, opacity }: Props) {
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
   if (!type) return null;
+
   const isGoing = type === 'going';
+
   return (
     <Animated.View
       style={[
         styles.stamp,
         isGoing ? styles.going : styles.nah,
-        { opacity },
+        animStyle,
       ]}
-      entering={FadeIn.duration(100)}
     >
       <Text style={[styles.text, isGoing ? styles.goingText : styles.nahText]}>
         {isGoing ? 'GOING' : 'NAH'}
@@ -29,30 +33,30 @@ export function StampOverlay({ type, opacity }: Props) {
 const styles = StyleSheet.create({
   stamp: {
     position: 'absolute',
-    top: 60,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 4,
-    zIndex: 10,
-    transform: [{ rotate: '-15deg' }],
+    top: 64,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 3.5,
+    zIndex: 20,
   },
   going: {
     left: 20,
     borderColor: '#00C851',
-    backgroundColor: 'rgba(0,200,81,0.15)',
+    backgroundColor: 'rgba(0,200,81,0.12)',
+    transform: [{ rotate: '-14deg' }],
   },
   nah: {
     right: 20,
-    borderColor: '#999',
-    backgroundColor: 'rgba(153,153,153,0.15)',
-    transform: [{ rotate: '15deg' }],
+    borderColor: '#888',
+    backgroundColor: 'rgba(136,136,136,0.12)',
+    transform: [{ rotate: '14deg' }],
   },
   text: {
-    fontSize: 28,
-    fontFamily: 'BebasNeue',
-    letterSpacing: 4,
+    fontSize: 30,
+    fontFamily: Fonts.headline,
+    letterSpacing: 5,
   },
   goingText: { color: '#00C851' },
-  nahText: { color: '#999' },
+  nahText: { color: '#888' },
 });

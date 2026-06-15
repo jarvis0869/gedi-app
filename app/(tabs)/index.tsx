@@ -1,14 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Dimensions,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFeed } from '@/hooks/useFeed';
 import { useSaved } from '@/hooks/useSaved';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,11 +15,12 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { PlaceCard } from '@/components/PlaceCard';
 import { EventCard } from '@/components/EventCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
+import { GlowBackground } from '@/components/GlowBackground';
 import { FeedCard } from '@/lib/feedMixer';
 import { PlaceCard as PlaceCardType } from '@/lib/places';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 export default function FeedScreen() {
   const { user } = useAuth();
@@ -36,49 +36,62 @@ export default function FeedScreen() {
     }, [])
   );
 
-  const handleSwipeRight = useCallback(
-    async (card: FeedCard) => {
-      await save(card);
-      setTopIndex((i) => i + 1);
-    },
-    [save]
-  );
+  const handleSwipeRight = useCallback(async (card: FeedCard) => {
+    await save(card);
+    setTopIndex((i) => i + 1);
+  }, [save]);
 
-  const handleSwipeLeft = useCallback((card: FeedCard) => {
+  const handleSwipeLeft = useCallback(() => {
     setTopIndex((i) => i + 1);
   }, []);
 
   const visibleCards = cards.slice(topIndex, topIndex + 4);
-  const isEmpty = !loading && cards.length === 0;
+  const isEmpty = !loading && !error && cards.length === 0;
   const allSwiped = !loading && cards.length > 0 && topIndex >= cards.length;
 
   return (
     <View style={styles.container}>
+      <LinearGradient
+        colors={['rgba(255,107,0,0.06)', Colors.bg, Colors.bg]}
+        locations={[0, 0.4, 1]}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+
       <View style={styles.header}>
-        <Text style={styles.logoText}>GEDI</Text>
-        <Text style={styles.location}>Hauz Khas Village</Text>
+        <View>
+          <Text style={styles.logoText}>GEDI</Text>
+        </View>
+        <View style={styles.locationPill}>
+          <Text style={styles.locationDot}>●</Text>
+          <Text style={styles.locationText}>Hauz Khas Village</Text>
+        </View>
       </View>
 
       {loading && (
         <View style={styles.stack}>
+          <GlowBackground intensity="soft" yOffset={height * 0.45} />
           <SkeletonCard />
         </View>
       )}
 
       {error && !loading && (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>Couldn't load feed</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load}>
+          <Text style={styles.emptyEmoji}>⚡</Text>
+          <Text style={styles.emptyTitle}>Couldn't load feed</Text>
+          <Text style={styles.emptySubtitle}>Check your connection and try again</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.8}>
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {isEmpty && !error && (
+      {isEmpty && (
         <View style={styles.centered}>
           <Text style={styles.emptyEmoji}>🌃</Text>
-          <Text style={styles.emptyText}>Nothing nearby right now</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={load}>
+          <Text style={styles.emptyTitle}>Quiet night in HKV</Text>
+          <Text style={styles.emptySubtitle}>Nothing nearby right now. Check back soon.</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.8}>
             <Text style={styles.retryText}>Refresh</Text>
           </TouchableOpacity>
         </View>
@@ -87,8 +100,13 @@ export default function FeedScreen() {
       {allSwiped && (
         <View style={styles.centered}>
           <Text style={styles.emptyEmoji}>🎉</Text>
-          <Text style={styles.emptyText}>You've seen everything!</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => { setTopIndex(0); load(); }}>
+          <Text style={styles.emptyTitle}>You've seen it all!</Text>
+          <Text style={styles.emptySubtitle}>Check back tomorrow for new places and events.</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => { setTopIndex(0); load(); }}
+            activeOpacity={0.8}
+          >
             <Text style={styles.retryText}>Start Over</Text>
           </TouchableOpacity>
         </View>
@@ -96,6 +114,7 @@ export default function FeedScreen() {
 
       {!loading && !isEmpty && !allSwiped && (
         <View style={styles.stack}>
+          <GlowBackground intensity="soft" yOffset={height * 0.45} />
           {[...visibleCards].reverse().map((card, revIdx) => {
             const idx = visibleCards.length - 1 - revIdx;
             const isTop = idx === 0;
@@ -134,21 +153,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.screenPad,
+    paddingTop: Spacing.headerTop,
+    paddingBottom: 10,
+    zIndex: 1,
   },
   logoText: {
     fontFamily: Fonts.headline,
-    fontSize: 28,
+    fontSize: 26,
     color: Colors.primary,
-    letterSpacing: 4,
+    letterSpacing: 5,
   },
-  location: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    color: Colors.muted,
+  locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.glass,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 100,
   },
+  locationDot: { fontSize: 8, color: Colors.success },
+  locationText: { fontFamily: Fonts.body, fontSize: 12, color: Colors.muted },
   stack: {
     flex: 1,
     alignItems: 'center',
@@ -158,26 +186,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
-    gap: 16,
+    paddingHorizontal: 40,
+    gap: 10,
   },
-  errorText: {
+  emptyEmoji: { fontSize: 56, marginBottom: 4 },
+  emptyTitle: {
     fontFamily: Fonts.bodySemiBold,
-    fontSize: 18,
+    fontSize: 20,
     color: Colors.white,
     textAlign: 'center',
   },
-  emptyEmoji: { fontSize: 64 },
-  emptyText: {
-    fontFamily: Fonts.bodySemiBold,
-    fontSize: 18,
-    color: Colors.white,
+  emptySubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    color: Colors.muted,
     textAlign: 'center',
+    lineHeight: 20,
   },
   retryBtn: {
+    marginTop: 8,
     backgroundColor: Colors.primary,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 13,
     borderRadius: 100,
   },
   retryText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.white },

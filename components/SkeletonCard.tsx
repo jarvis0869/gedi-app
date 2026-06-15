@@ -7,20 +7,48 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius } from '@/constants/theme';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width - 32;
 const CARD_HEIGHT = height * 0.72;
 
-export function SkeletonCard() {
+function ShimmerBar({ w = '100%', h = 14, mt = 0 }: { w?: number | string; h?: number; mt?: number }) {
   const opacity = useSharedValue(0.3);
 
   useEffect(() => {
     opacity.value = withRepeat(
       withSequence(
-        withTiming(0.7, { duration: 800 }),
-        withTiming(0.3, { duration: 800 })
+        withTiming(0.7, { duration: 900 }),
+        withTiming(0.3, { duration: 900 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View
+      style={[
+        { width: w as any, height: h, marginTop: mt, borderRadius: Radius.xs + 2 },
+        { backgroundColor: Colors.glassStrong },
+        animStyle,
+      ]}
+    />
+  );
+}
+
+export function SkeletonCard() {
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 1100 }),
+        withTiming(1, { duration: 1100 })
       ),
       -1,
       false
@@ -31,11 +59,23 @@ export function SkeletonCard() {
 
   return (
     <Animated.View style={[styles.card, animStyle]}>
-      <View style={styles.image} />
+      <View style={styles.imageArea}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </View>
       <View style={styles.content}>
-        <View style={styles.titleLine} />
-        <View style={styles.subtitleLine} />
-        <View style={[styles.subtitleLine, { width: '50%', marginTop: 8 }]} />
+        <ShimmerBar w="65%" h={28} />
+        <ShimmerBar w="90%" h={13} mt={12} />
+        <ShimmerBar w="50%" h={13} mt={8} />
+        <View style={styles.hintRow}>
+          <ShimmerBar w={60} h={10} />
+          <ShimmerBar w={60} h={10} />
+          <ShimmerBar w={60} h={10} />
+        </View>
       </View>
     </Animated.View>
   );
@@ -51,25 +91,18 @@ const styles = StyleSheet.create({
     borderColor: Colors.glassBorder,
     overflow: 'hidden',
   },
-  image: {
+  imageArea: {
     width: '100%',
-    height: '65%',
-    backgroundColor: Colors.glassStrong,
+    height: '62%',
+    backgroundColor: Colors.glass,
   },
   content: {
     padding: 20,
+    gap: 0,
   },
-  titleLine: {
-    height: 28,
-    width: '70%',
-    backgroundColor: Colors.glassStrong,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  subtitleLine: {
-    height: 14,
-    width: '90%',
-    backgroundColor: Colors.glassStrong,
-    borderRadius: 4,
+  hintRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
   },
 });

@@ -6,12 +6,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { GlowBackground } from '@/components/GlowBackground';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function PhoneScreen() {
   const router = useRouter();
@@ -20,14 +22,14 @@ export default function PhoneScreen() {
   const [error, setError] = useState('');
 
   const handleSendOTP = async () => {
-    const full = `+91${phone.replace(/\D/g, '')}`;
-    if (full.length !== 13) { setError('Enter a valid 10 digit phone number'); return; }
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10) { setError('Enter a valid 10-digit number'); return; }
     setLoading(true);
     setError('');
-    const { error: err } = await supabase.auth.signInWithOtp({ phone: full });
+    const { error: err } = await supabase.auth.signInWithOtp({ phone: `+91${digits}` });
     setLoading(false);
     if (err) { setError(err.message); return; }
-    router.push({ pathname: '/auth/otp', params: { phone: full } });
+    router.push({ pathname: '/auth/otp', params: { phone: `+91${digits}` } });
   };
 
   return (
@@ -35,18 +37,31 @@ export default function PhoneScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <GlowBackground intensity="soft" yOffset={260} />
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.logoArea}>
           <Text style={styles.logo}>GEDI</Text>
-          <Text style={styles.tagline}>Tera sheher. Teri gedi.</Text>
+          <View style={styles.taglineRow}>
+            <View style={styles.taglineLine} />
+            <Text style={styles.tagline}>Tera sheher. Teri gedi.</Text>
+            <View style={styles.taglineLine} />
+          </View>
         </View>
 
         <View style={styles.form}>
           <Text style={styles.label}>Phone Number</Text>
           <View style={styles.inputRow}>
-            <View style={styles.prefix}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+              style={styles.prefix}
+            >
               <Text style={styles.prefixText}>+91</Text>
-            </View>
+            </LinearGradient>
             <TextInput
               style={styles.input}
               placeholder="9XXXXXXXXX"
@@ -54,23 +69,24 @@ export default function PhoneScreen() {
               keyboardType="phone-pad"
               maxLength={10}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(t) => { setPhone(t); setError(''); }}
               selectionColor={Colors.primary}
+              autoFocus
             />
           </View>
 
           {!!error && <Text style={styles.error}>{error}</Text>}
 
-          <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
+          <PrimaryButton
+            label={loading ? 'Sending…' : 'Send OTP'}
             onPress={handleSendOTP}
-            disabled={loading}
-          >
-            <Text style={styles.btnText}>{loading ? 'Sending…' : 'Send OTP'}</Text>
-          </TouchableOpacity>
+            loading={loading}
+            disabled={phone.replace(/\D/g, '').length !== 10}
+            style={styles.btn}
+          />
 
           <Text style={styles.disclaimer}>
-            We'll send a one-time code to verify your number. No password needed.
+            One-time code sent via SMS. No passwords ever.
           </Text>
         </View>
       </ScrollView>
@@ -80,26 +96,29 @@ export default function PhoneScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 28 },
-  logoArea: { alignItems: 'center', marginBottom: 60 },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: Spacing.screenPad + 8 },
+  logoArea: { alignItems: 'center', marginBottom: 64 },
   logo: {
     fontFamily: Fonts.headline,
-    fontSize: 72,
+    fontSize: 80,
     color: Colors.primary,
-    letterSpacing: 8,
+    letterSpacing: 10,
+    lineHeight: 88,
   },
+  taglineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  taglineLine: { flex: 1, height: 1, backgroundColor: Colors.glassBorder },
   tagline: {
     fontFamily: Fonts.body,
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.muted,
-    marginTop: 8,
+    letterSpacing: 0.5,
   },
   form: {},
   label: {
     fontFamily: Fonts.bodySemiBold,
-    fontSize: 13,
+    fontSize: 11,
     color: Colors.muted,
-    letterSpacing: 1,
+    letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 10,
   },
@@ -109,10 +128,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 14,
+    backgroundColor: Colors.glass,
   },
   prefix: {
-    backgroundColor: Colors.glassStrong,
     paddingHorizontal: 16,
     justifyContent: 'center',
     borderRightWidth: 1,
@@ -127,10 +146,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    fontSize: 18,
+    fontSize: 20,
     color: Colors.white,
-    fontFamily: Fonts.body,
-    letterSpacing: 2,
+    fontFamily: Fonts.bodySemiBold,
+    letterSpacing: 3,
   },
   error: {
     fontFamily: Fonts.body,
@@ -138,24 +157,11 @@ const styles = StyleSheet.create({
     color: Colors.error,
     marginBottom: 12,
   },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.button,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: {
-    fontFamily: Fonts.bodySemiBold,
-    fontSize: 16,
-    color: Colors.white,
-    letterSpacing: 1,
-  },
+  btn: { marginTop: 4 },
   disclaimer: {
     fontFamily: Fonts.body,
     fontSize: 12,
-    color: Colors.muted,
+    color: Colors.mutedLight,
     textAlign: 'center',
     marginTop: 20,
     lineHeight: 18,
