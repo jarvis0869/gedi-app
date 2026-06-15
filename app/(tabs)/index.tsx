@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -167,132 +168,135 @@ export default function FeedScreen() {
   const showStack = !loading && !error && !isEmpty && !allSwiped;
 
   return (
-    <GestureDetector gesture={pullGesture}>
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['rgba(255,107,0,0.055)', Colors.bg]}
-          locations={[0, 0.45]}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['rgba(255,107,0,0.055)', Colors.bg]}
+        locations={[0, 0.45]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
 
-        {/* Pull-to-refresh indicator */}
-        <Animated.View style={[styles.pullIndicator, pullIndicatorStyle]} pointerEvents="none">
-          <Text style={styles.pullText}>↓ Release to refresh</Text>
-        </Animated.View>
+      {/* Pull-to-refresh indicator — absolute, never intercepts touches */}
+      <Animated.View style={[styles.pullIndicator, pullIndicatorStyle]} pointerEvents="none">
+        <Text style={styles.pullText}>↓ Release to refresh</Text>
+      </Animated.View>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <Text style={styles.logo}>GEDI</Text>
-            {isGhost && (
-              <View style={styles.ghostBadge}>
-                <Text style={styles.ghostBadgeText}>👻 Ghost</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.headerRight}>
-            <View style={styles.locationPill}>
-              <View style={styles.greenDot} />
-              <Text style={styles.locationText}>Hauz Khas Village</Text>
+      {/* Header — outside GestureDetector so buttons always receive taps */}
+      <View style={styles.header}>
+        <View style={styles.logoRow}>
+          <Text style={styles.logo}>GEDI</Text>
+          {isGhost && (
+            <View style={styles.ghostBadge}>
+              <Text style={styles.ghostBadgeText}>👻 Ghost</Text>
             </View>
-            <TouchableOpacity
-              style={styles.refreshBtn}
-              onPress={doRefresh}
-              disabled={isRefreshing || loading}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Animated.Text style={[styles.refreshIcon, refreshIconStyle]}>↻</Animated.Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
-
-        {/* Counter */}
-        {showStack && (
-          <Animated.View style={[styles.counter, counterStyle]}>
-            <Text style={styles.counterText}>
-              {topIndex + 1}
-              <Text style={styles.counterOf}> / {cards.length}</Text>
-            </Text>
-          </Animated.View>
-        )}
-
-        {/* Warning toast */}
-        {warning && (
-          <WarningToast message={warning} onDismiss={() => setWarning(null)} />
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <View style={styles.stackArea}>
-            <GlowBackground intensity="soft" yOffset={height * 0.46} />
-            <SkeletonStack />
+        <View style={styles.headerRight}>
+          <View style={styles.locationPill}>
+            <View style={styles.greenDot} />
+            <Text style={styles.locationText}>Hauz Khas Village</Text>
           </View>
-        )}
-
-        {/* Error */}
-        {!loading && error && (
-          <View style={styles.centered}>
-            <Text style={styles.stateEmoji}>⚡</Text>
-            <Text style={styles.stateTitle}>Couldn't load feed</Text>
-            <Text style={styles.stateSubtitle}>Check your connection and try again</Text>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => load(true)} activeOpacity={0.8}>
-              <Text style={styles.actionBtnText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Empty */}
-        {isEmpty && (
-          <View style={styles.centered}>
-            <Text style={styles.stateEmoji}>🌃</Text>
-            <Text style={styles.stateTitle}>Quiet night in HKV</Text>
-            <Text style={styles.stateSubtitle}>Nothing nearby right now. Check back soon.</Text>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => load(true)} activeOpacity={0.8}>
-              <Text style={styles.actionBtnText}>Refresh</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* All swiped */}
-        {allSwiped && (
-          <View style={styles.centered}>
-            <Text style={styles.stateEmoji}>🎉</Text>
-            <Text style={styles.stateTitle}>You've seen it all!</Text>
-            <Text style={styles.stateSubtitle}>
-              New places and events tomorrow.{'\n'}Check Saved for your shortlist.
-            </Text>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => { setTopIndex(0); load(true); }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.actionBtnText}>Start Over</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Card stack */}
-        {showStack && (
-          <View style={styles.stackArea}>
-            <GlowBackground intensity="soft" yOffset={height * 0.46} />
-            <CardStack
-              cards={cards}
-              topIndex={topIndex}
-              onSwipeRight={handleSwipeRight}
-              onSwipeLeft={handleSwipeLeft}
-              onSwipeUp={handleSwipeUp}
-            />
-            <SwipeTutorial visible={showTutorial && topIndex === 0} />
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={doRefresh}
+            disabled={isRefreshing || loading}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Animated.Text style={[styles.refreshIcon, refreshIconStyle]}>↻</Animated.Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </GestureDetector>
+
+      {/* Counter — absolute, non-interactive */}
+      {showStack && (
+        <Animated.View style={[styles.counter, counterStyle]}>
+          <Text style={styles.counterText}>
+            {topIndex + 1}
+            <Text style={styles.counterOf}> / {cards.length}</Text>
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* Warning toast */}
+      {warning && (
+        <WarningToast message={warning} onDismiss={() => setWarning(null)} />
+      )}
+
+      {/* Content area — GestureDetector only here, away from header buttons */}
+      <GestureDetector gesture={pullGesture}>
+        <View style={styles.content}>
+          {/* Loading */}
+          {loading && (
+            <View style={styles.stackArea}>
+              <GlowBackground intensity="soft" yOffset={height * 0.46} />
+              <SkeletonStack />
+            </View>
+          )}
+
+          {/* Error */}
+          {!loading && error && (
+            <View style={styles.centered}>
+              <Text style={styles.stateEmoji}>⚡</Text>
+              <Text style={styles.stateTitle}>Couldn't load feed</Text>
+              <Text style={styles.stateSubtitle}>Check your connection and try again</Text>
+              <Pressable style={styles.actionBtn} onPress={() => load(true)}>
+                <Text style={styles.actionBtnText}>Try Again</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Empty */}
+          {isEmpty && (
+            <View style={styles.centered}>
+              <Text style={styles.stateEmoji}>🌃</Text>
+              <Text style={styles.stateTitle}>Quiet night in HKV</Text>
+              <Text style={styles.stateSubtitle}>Nothing nearby right now. Check back soon.</Text>
+              <Pressable style={styles.actionBtn} onPress={() => load(true)}>
+                <Text style={styles.actionBtnText}>Refresh</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* All swiped */}
+          {allSwiped && (
+            <View style={styles.centered}>
+              <Text style={styles.stateEmoji}>🎉</Text>
+              <Text style={styles.stateTitle}>You've seen it all!</Text>
+              <Text style={styles.stateSubtitle}>
+                New places and events tomorrow.{'\n'}Check Saved for your shortlist.
+              </Text>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => { setTopIndex(0); load(true); }}
+              >
+                <Text style={styles.actionBtnText}>Start Over</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Card stack */}
+          {showStack && (
+            <View style={styles.stackArea}>
+              <GlowBackground intensity="soft" yOffset={height * 0.46} />
+              <CardStack
+                cards={cards}
+                topIndex={topIndex}
+                onSwipeRight={handleSwipeRight}
+                onSwipeLeft={handleSwipeLeft}
+                onSwipeUp={handleSwipeUp}
+              />
+              <SwipeTutorial visible={showTutorial && topIndex === 0} />
+            </View>
+          )}
+        </View>
+      </GestureDetector>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
+  content: { flex: 1 },
 
   pullIndicator: {
     position: 'absolute',

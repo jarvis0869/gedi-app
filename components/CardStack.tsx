@@ -195,7 +195,7 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
             <EventCardView card={topCard as AnyEvent} />
           )}
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <StampOverlay type={stamp.value} opacity={stampOpacity} />
+            <StampOverlay type={stamp} opacity={stampOpacity} />
           </View>
         </Animated.View>
       </GestureDetector>

@@ -1,32 +1,35 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import { Fonts } from '@/constants/theme';
 
 interface Props {
-  type: 'going' | 'nah' | null;
+  type: SharedValue<'going' | 'nah' | null>;
   opacity: SharedValue<number>;
 }
 
 export function StampOverlay({ type, opacity }: Props) {
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    display: type.value ? 'flex' : 'none',
+  }));
 
-  if (!type) return null;
-
-  const isGoing = type === 'going';
+  const isGoingStyle = useAnimatedStyle(() => ({
+    display: type.value === 'going' ? 'flex' : 'none',
+  }));
+  const isNahStyle = useAnimatedStyle(() => ({
+    display: type.value === 'nah' ? 'flex' : 'none',
+  }));
 
   return (
-    <Animated.View
-      style={[
-        styles.stamp,
-        isGoing ? styles.going : styles.nah,
-        animStyle,
-      ]}
-    >
-      <Text style={[styles.text, isGoing ? styles.goingText : styles.nahText]}>
-        {isGoing ? 'GOING' : 'NAH'}
-      </Text>
-    </Animated.View>
+    <>
+      <Animated.View style={[styles.stamp, styles.going, animStyle, isGoingStyle]}>
+        <Text style={[styles.text, styles.goingText]}>GOING</Text>
+      </Animated.View>
+      <Animated.View style={[styles.stamp, styles.nah, animStyle, isNahStyle]}>
+        <Text style={[styles.text, styles.nahText]}>NAH</Text>
+      </Animated.View>
+    </>
   );
 }
 
