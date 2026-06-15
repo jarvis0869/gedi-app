@@ -43,6 +43,7 @@ export default {
           'Gedi uses your location to show nearby places and verify check-ins.',
         NSLocationAlwaysUsageDescription:
           'Gedi uses your location to show nearby places and verify check-ins.',
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
 
