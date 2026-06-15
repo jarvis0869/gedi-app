@@ -18,9 +18,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchPlaceDetails, PlaceDetail } from '@/lib/places';
-import { useCheckin } from '@/hooks/useCheckin';
+import { useCheckin, CheckinResult, CHECKIN_RADIUS_METERS, formatDistance } from '@/hooks/useCheckin';
 import { useAuth } from '@/hooks/useAuth';
 import { CheckinSuccess } from '@/components/CheckinSuccess';
+import { CheckinFeedback } from '@/components/CheckinFeedback';
 import { GlassCard } from '@/components/GlassCard';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
@@ -65,12 +66,13 @@ export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
-  const { checkin, loading: checkinLoading, result, clearResult } = useCheckin(user?.id);
+  const { checkin, loading: checkinLoading, result, distanceToPlace, clearResult } = useCheckin(user?.id);
   const [place, setPlace] = useState<PlaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [photoIdx, setPhotoIdx] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [feedbackResult, setFeedbackResult] = useState<Exclude<CheckinResult, 'success' | null> | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -81,14 +83,13 @@ export default function PlaceDetailScreen() {
   }, [id]);
 
   useEffect(() => {
+    if (!result) return;
     if (result === 'success') {
       setShowSuccess(true);
-      clearResult();
-    } else if (result === 'too_far') {
-      clearResult();
-    } else if (result === 'already') {
-      clearResult();
+    } else {
+      setFeedbackResult(result);
     }
+    clearResult();
   }, [result]);
 
   const openMaps = () => {
@@ -149,10 +150,20 @@ export default function PlaceDetailScreen() {
   const isOpen = place.opening_hours?.open_now;
   const todayHours = place.hours_text?.[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
+  const withinRange = distanceToPlace !== null && distanceToPlace <= CHECKIN_RADIUS_METERS;
+  const distLabel = distanceToPlace !== null ? formatDistance(distanceToPlace) : null;
+
   return (
     <View style={styles.container}>
       {showSuccess && (
         <CheckinSuccess points={10} onDone={() => setShowSuccess(false)} />
+      )}
+      {feedbackResult && (
+        <CheckinFeedback
+          result={feedbackResult}
+          distanceToPlace={distanceToPlace}
+          onDismiss={() => setFeedbackResult(null)}
+        />
       )}
 
       {/* Back button */}
@@ -338,6 +349,18 @@ export default function PlaceDetailScreen() {
               <Text style={styles.btnSecondaryText}>Share</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Distance hint shown after first check-in attempt */}
+          {distLabel && (
+            <View style={styles.distanceRow}>
+              <View style={[styles.distanceDot, withinRange ? styles.distanceDotGreen : styles.distanceDotOrange]} />
+              <Text style={[styles.distanceText, withinRange ? styles.distanceTextGreen : styles.distanceTextOrange]}>
+                {withinRange
+                  ? `Within range · ${distLabel} away`
+                  : `${distLabel} away · Need to be within 500m`}
+              </Text>
+            </View>
+          )}
 
           {/* Check in */}
           <TouchableOpacity
@@ -575,4 +598,18 @@ const styles = StyleSheet.create({
   },
   checkinText: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.success, letterSpacing: 0.3 },
   btnDisabled: { opacity: 0.5 },
+
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  distanceDot: { width: 8, height: 8, borderRadius: 4 },
+  distanceDotGreen: { backgroundColor: Colors.success },
+  distanceDotOrange: { backgroundColor: '#FF8C00' },
+  distanceText: { fontFamily: Fonts.body, fontSize: 12 },
+  distanceTextGreen: { color: Colors.success },
+  distanceTextOrange: { color: '#FF8C00' },
 });
