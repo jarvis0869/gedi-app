@@ -1,41 +1,50 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { GlowBackground } from '@/components/GlowBackground';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
-const MODES = [
+type PrivacyMode = 'ghost' | 'friends' | 'public';
+
+const MODES: { key: PrivacyMode; icon: string; label: string; desc: string }[] = [
   {
     key: 'ghost',
-    label: 'Ghost',
     icon: '👻',
-    desc: 'Totally invisible. No one knows you\'re here. You can still see everything.',
+    label: 'Ghost',
+    desc: 'Totally invisible. You can see everything but no one sees you.',
   },
   {
     key: 'friends',
-    label: 'Friends Only',
     icon: '👥',
-    desc: 'Only your approved connections see your activity. Good middle ground.',
+    label: 'Friends Only',
+    desc: 'Only approved connections see your activity.',
   },
   {
     key: 'public',
-    label: 'Public',
     icon: '🌍',
-    desc: 'Your check-ins and saves show in community counts. Be seen, be social.',
+    label: 'Public',
+    desc: 'Check-ins and saves show in community counts. Default.',
   },
-] as const;
+];
 
 export default function PrivacyScreen() {
-  const { user } = useAuth();
+  const { user, markOnboarded } = useAuth();
   const router = useRouter();
-  const [selected, setSelected] = useState<'ghost' | 'friends' | 'public'>('public');
+  const [selected, setSelected] = useState<PrivacyMode>('public');
   const [loading, setLoading] = useState(false);
 
   const handleContinue = async () => {
     setLoading(true);
     if (user) {
-      await supabase.from('users').update({ privacy_mode: selected }).eq('id', user.id);
+      await supabase
+        .from('users')
+        .update({ privacy_mode: selected })
+        .eq('id', user.id);
+      await markOnboarded(user.id);
     }
     setLoading(false);
     router.replace('/(tabs)');
@@ -43,55 +52,67 @@ export default function PrivacyScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>PRIVACY</Text>
-      <Text style={styles.subtitle}>Who sees your Gedi activity?</Text>
+      <GlowBackground intensity="soft" yOffset={220} />
 
-      <View style={styles.options}>
-        {MODES.map((mode) => (
-          <TouchableOpacity
-            key={mode.key}
-            style={[styles.option, selected === mode.key && styles.optionSelected]}
-            onPress={() => setSelected(mode.key)}
-          >
-            <Text style={styles.optionIcon}>{mode.icon}</Text>
-            <View style={styles.optionContent}>
-              <Text style={[styles.optionLabel, selected === mode.key && styles.optionLabelSelected]}>
-                {mode.label}
-              </Text>
-              <Text style={styles.optionDesc}>{mode.desc}</Text>
-            </View>
-            {selected === mode.key && (
-              <View style={styles.check}>
-                <Text style={styles.checkText}>✓</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+      <View style={styles.inner}>
+        <Text style={styles.title}>PRIVACY</Text>
+        <Text style={styles.subtitle}>Who sees your Gedi activity?</Text>
+
+        <View style={styles.options}>
+          {MODES.map((mode) => {
+            const active = selected === mode.key;
+            return (
+              <TouchableOpacity
+                key={mode.key}
+                onPress={() => setSelected(mode.key)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={
+                    active
+                      ? ['rgba(255,107,0,0.12)', 'rgba(255,107,0,0.04)']
+                      : ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.02)']
+                  }
+                  style={[styles.option, active && styles.optionActive]}
+                >
+                  <Text style={styles.optionIcon}>{mode.icon}</Text>
+                  <View style={styles.optionContent}>
+                    <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>
+                      {mode.label}
+                    </Text>
+                    <Text style={styles.optionDesc}>{mode.desc}</Text>
+                  </View>
+                  <View style={[styles.radio, active && styles.radioActive]}>
+                    {active && <View style={styles.radioDot} />}
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.note}>You can change this anytime in Profile settings.</Text>
+
+        <PrimaryButton
+          label={loading ? 'Saving…' : 'Start Exploring →'}
+          onPress={handleContinue}
+          loading={loading}
+        />
       </View>
-
-      <Text style={styles.note}>You can change this anytime in Profile.</Text>
-
-      <TouchableOpacity
-        style={[styles.btn, loading && styles.btnDisabled]}
-        onPress={handleContinue}
-        disabled={loading}
-      >
-        <Text style={styles.btnText}>{loading ? 'Saving…' : 'Start Exploring'}</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: Colors.bg },
+  inner: {
     flex: 1,
-    backgroundColor: Colors.bg,
-    padding: 28,
+    paddingHorizontal: Spacing.screenPad + 8,
     justifyContent: 'center',
   },
   title: {
     fontFamily: Fonts.headline,
-    fontSize: 48,
+    fontSize: 52,
     color: Colors.primary,
     letterSpacing: 6,
     textAlign: 'center',
@@ -102,55 +123,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.muted,
     textAlign: 'center',
-    marginBottom: 36,
+    marginBottom: 32,
   },
-  options: { gap: 12, marginBottom: 24 },
+  options: { gap: 10, marginBottom: 20 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.glass,
+    padding: 16,
+    borderRadius: Radius.card,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
-    borderRadius: Radius.card,
-    padding: 16,
     gap: 14,
   },
-  optionSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(255,107,0,0.08)',
+  optionActive: {
+    borderColor: 'rgba(255,107,0,0.5)',
   },
-  optionIcon: { fontSize: 32 },
+  optionIcon: { fontSize: 28 },
   optionContent: { flex: 1 },
   optionLabel: {
     fontFamily: Fonts.bodySemiBold,
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.muted,
-    marginBottom: 4,
+    marginBottom: 3,
   },
-  optionLabelSelected: { color: Colors.white },
-  optionDesc: { fontFamily: Fonts.body, fontSize: 13, color: Colors.muted, lineHeight: 18 },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
+  optionLabelActive: { color: Colors.white },
+  optionDesc: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.mutedLight,
+    lineHeight: 17,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: Colors.muted,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkText: { color: Colors.white, fontSize: 14, fontFamily: Fonts.bodyBold },
+  radioActive: { borderColor: Colors.primary },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
+  },
   note: {
     fontFamily: Fonts.body,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    color: Colors.mutedLight,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
+    lineHeight: 18,
   },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.button,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.white },
 });

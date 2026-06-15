@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -8,27 +9,59 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { GlowBackground } from '@/components/GlowBackground';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+
+const OTP_LENGTH = 6;
 
 export default function OTPScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const router = useRouter();
-  const [otp, setOtp] = useState('');
+  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(30);
-  const ref = useRef<TextInput>(null);
+  const [resending, setResending] = useState(false);
+  const refs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
-    ref.current?.focus();
-    const timer = setInterval(() => setCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
-    return () => clearInterval(timer);
+    setTimeout(() => refs.current[0]?.focus(), 300);
+    const t = setInterval(() => setCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(t);
   }, []);
 
+  const handleDigit = (text: string, index: number) => {
+    const char = text.replace(/[^0-9]/g, '').slice(-1);
+    const next = [...digits];
+    next[index] = char;
+    setDigits(next);
+    setError('');
+    if (char && index < OTP_LENGTH - 1) {
+      refs.current[index + 1]?.focus();
+    }
+    if (char && index === OTP_LENGTH - 1) {
+      Keyboard.dismiss();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !digits[index] && index > 0) {
+      const next = [...digits];
+      next[index - 1] = '';
+      setDigits(next);
+      refs.current[index - 1]?.focus();
+    }
+  };
+
+  const otp = digits.join('');
+  const isComplete = otp.length === OTP_LENGTH;
+
   const handleVerify = async () => {
-    if (otp.length !== 6) { setError('Enter the 6-digit code'); return; }
+    if (!isComplete) return;
     setLoading(true);
     setError('');
     const { data, error: err } = await supabase.auth.verifyOtp({
@@ -36,18 +69,32 @@ export default function OTPScreen() {
       token: otp,
       type: 'sms',
     });
-    setLoading(false);
-    if (err) { setError(err.message); return; }
-    if (data.user) {
-      await supabase.from('users').upsert({ id: data.user.id, phone: phone }, { onConflict: 'id' });
+    if (err) {
+      setLoading(false);
+      setError(err.message || 'Invalid code. Please try again.');
+      setDigits(Array(OTP_LENGTH).fill(''));
+      setTimeout(() => refs.current[0]?.focus(), 100);
+      return;
     }
+    if (data.user) {
+      await supabase.from('users').upsert(
+        { id: data.user.id, phone: phone },
+        { onConflict: 'id' }
+      );
+    }
+    setLoading(false);
     router.replace('/auth/location');
   };
 
   const handleResend = async () => {
-    if (countdown > 0) return;
+    if (countdown > 0 || resending) return;
+    setResending(true);
+    setError('');
+    setDigits(Array(OTP_LENGTH).fill(''));
     await supabase.auth.signInWithOtp({ phone: phone! });
     setCountdown(30);
+    setResending(false);
+    setTimeout(() => refs.current[0]?.focus(), 100);
   };
 
   return (
@@ -55,49 +102,60 @@ export default function OTPScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <GlowBackground intensity="soft" yOffset={300} />
+
       <View style={styles.inner}>
         <TouchableOpacity style={styles.back} onPress={() => router.back()}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>VERIFY</Text>
-        <Text style={styles.subtitle}>
-          Enter the 6-digit code sent to{'\n'}
+        <View style={styles.headingArea}>
+          <Text style={styles.title}>VERIFY</Text>
+          <Text style={styles.subtitle}>Code sent to</Text>
           <Text style={styles.phone}>{phone}</Text>
-        </Text>
+        </View>
 
-        <TextInput
-          ref={ref}
-          style={styles.input}
-          keyboardType="number-pad"
-          maxLength={6}
-          value={otp}
-          onChangeText={setOtp}
-          placeholder="• • • • • •"
-          placeholderTextColor={Colors.muted}
-          selectionColor={Colors.primary}
-          textAlign="center"
+        <View style={styles.boxes}>
+          {digits.map((d, i) => (
+            <TextInput
+              key={i}
+              ref={(r) => { refs.current[i] = r; }}
+              style={[styles.box, d ? styles.boxFilled : null, error ? styles.boxError : null]}
+              value={d}
+              onChangeText={(t) => handleDigit(t, i)}
+              onKeyPress={(e) => handleKeyPress(e, i)}
+              keyboardType="number-pad"
+              maxLength={1}
+              selectTextOnFocus
+              selectionColor={Colors.primary}
+              caretHidden
+              textAlign="center"
+            />
+          ))}
+        </View>
+
+        {!!error && (
+          <View style={styles.errorRow}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <PrimaryButton
+          label="Verify"
+          onPress={handleVerify}
+          loading={loading}
+          disabled={!isComplete}
+          style={styles.btn}
         />
 
-        {!!error && <Text style={styles.error}>{error}</Text>}
-
-        <TouchableOpacity
-          style={[styles.btn, (loading || otp.length !== 6) && styles.btnDisabled]}
-          onPress={handleVerify}
-          disabled={loading || otp.length !== 6}
-        >
-          <Text style={styles.btnText}>{loading ? 'Verifying…' : 'Verify'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleResend}
-          disabled={countdown > 0}
-          style={styles.resend}
-        >
-          <Text style={[styles.resendText, countdown > 0 && styles.resendDisabled]}>
-            {countdown > 0 ? `Resend in ${countdown}s` : 'Resend OTP'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.resendRow}>
+          <Text style={styles.resendLabel}>Didn't get it? </Text>
+          <TouchableOpacity onPress={handleResend} disabled={countdown > 0 || resending}>
+            <Text style={[styles.resendBtn, (countdown > 0 || resending) && styles.resendDisabled]}>
+              {countdown > 0 ? `Resend in ${countdown}s` : resending ? 'Sending…' : 'Resend OTP'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -105,54 +163,64 @@ export default function OTPScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  inner: { flex: 1, padding: 28, justifyContent: 'center' },
-  back: { position: 'absolute', top: 56, left: 28 },
+  inner: {
+    flex: 1,
+    paddingHorizontal: Spacing.screenPad + 8,
+    justifyContent: 'center',
+  },
+  back: { position: 'absolute', top: Spacing.headerTop, left: Spacing.screenPad },
   backText: { fontFamily: Fonts.body, fontSize: 16, color: Colors.muted },
+  headingArea: { marginBottom: 40 },
   title: {
     fontFamily: Fonts.headline,
-    fontSize: 56,
+    fontSize: 60,
     color: Colors.primary,
-    letterSpacing: 6,
-    textAlign: 'center',
-    marginBottom: 12,
+    letterSpacing: 8,
+    marginBottom: 10,
   },
-  subtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    color: Colors.muted,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 40,
-  },
-  phone: { color: Colors.white, fontFamily: Fonts.bodySemiBold },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
-    borderRadius: Radius.button,
-    backgroundColor: Colors.glass,
-    fontSize: 32,
-    color: Colors.white,
-    paddingVertical: 20,
-    letterSpacing: 20,
+  subtitle: { fontFamily: Fonts.body, fontSize: 15, color: Colors.muted },
+  phone: { fontFamily: Fonts.bodySemiBold, fontSize: 18, color: Colors.white, marginTop: 2 },
+  boxes: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
+    gap: 8,
+  },
+  box: {
+    flex: 1,
+    height: 58,
+    borderRadius: Radius.button,
+    borderWidth: 1.5,
+    borderColor: Colors.glassBorder,
+    backgroundColor: Colors.glass,
+    fontSize: 26,
+    color: Colors.white,
     fontFamily: Fonts.bodySemiBold,
   },
-  error: {
+  boxFilled: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(255,107,0,0.08)',
+  },
+  boxError: {
+    borderColor: Colors.error,
+    backgroundColor: Colors.errorDim,
+  },
+  errorRow: {
+    marginBottom: 14,
+  },
+  errorText: {
     fontFamily: Fonts.body,
     fontSize: 13,
     color: Colors.error,
     textAlign: 'center',
-    marginBottom: 12,
   },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.button,
-    paddingVertical: 16,
+  btn: { marginBottom: 20 },
+  resendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.white },
-  resend: { marginTop: 20, alignItems: 'center' },
-  resendText: { fontFamily: Fonts.body, fontSize: 14, color: Colors.primary },
+  resendLabel: { fontFamily: Fonts.body, fontSize: 14, color: Colors.muted },
+  resendBtn: { fontFamily: Fonts.bodySemiBold, fontSize: 14, color: Colors.primary },
   resendDisabled: { color: Colors.muted },
 });

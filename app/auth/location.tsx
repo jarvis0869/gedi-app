@@ -1,102 +1,165 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { PrimaryButton } from '@/components/PrimaryButton';
+import { GlowBackground } from '@/components/GlowBackground';
+import { GlassCard } from '@/components/GlassCard';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+
+const REASONS = [
+  { icon: '🏙️', text: 'Show places near you in Hauz Khas Village' },
+  { icon: '📍', text: 'Verify you\'re actually at a spot when you check in (+10 pts)' },
+  { icon: '📏', text: 'Show how far each place is from you' },
+];
 
 export default function LocationScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [denied, setDenied] = useState(false);
 
   const handleAllow = async () => {
     setLoading(true);
-    await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.requestForegroundPermissionsAsync();
     setLoading(false);
+    if (status !== 'granted') setDenied(true);
     router.replace('/auth/privacy');
   };
 
+  const handleSkip = () => router.replace('/auth/privacy');
+
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>📍</Text>
-      <Text style={styles.title}>LOCATION</Text>
-      <Text style={styles.subtitle}>Gedi needs your location to</Text>
+      <GlowBackground intensity="soft" yOffset={200} />
 
-      <View style={styles.points}>
-        {[
-          'Show places near you in Hauz Khas Village',
-          'Verify you\'re actually at a spot when you check in',
-          'Calculate distance to nearby places',
-        ].map((point, i) => (
-          <View key={i} style={styles.point}>
-            <Text style={styles.bullet}>→</Text>
-            <Text style={styles.pointText}>{point}</Text>
-          </View>
-        ))}
+      <View style={styles.inner}>
+        <View style={styles.iconWrap}>
+          <LinearGradient
+            colors={['rgba(255,107,0,0.25)', 'rgba(255,107,0,0.05)']}
+            style={styles.iconBg}
+          >
+            <Text style={styles.icon}>📍</Text>
+          </LinearGradient>
+        </View>
+
+        <Text style={styles.title}>LOCATION</Text>
+        <Text style={styles.subtitle}>
+          Gedi needs to know where you are
+        </Text>
+
+        <GlassCard style={styles.reasons}>
+          {REASONS.map((r, i) => (
+            <View key={i} style={[styles.reason, i < REASONS.length - 1 && styles.reasonBorder]}>
+              <Text style={styles.reasonIcon}>{r.icon}</Text>
+              <Text style={styles.reasonText}>{r.text}</Text>
+            </View>
+          ))}
+        </GlassCard>
+
+        <View style={styles.privacyNote}>
+          <Text style={styles.privacyIcon}>🔒</Text>
+          <Text style={styles.privacyText}>
+            Your exact location is never stored in our database. Used only in the moment.
+          </Text>
+        </View>
+
+        {denied && (
+          <Text style={styles.deniedText}>
+            Location denied. You can enable it in Settings later.
+          </Text>
+        )}
+
+        <PrimaryButton
+          label={loading ? 'Requesting…' : 'Allow Location Access'}
+          onPress={handleAllow}
+          loading={loading}
+          style={styles.btn}
+        />
+
+        <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
+          <Text style={styles.skipText}>Skip for now</Text>
+        </TouchableOpacity>
       </View>
-
-      <Text style={styles.privacy}>
-        Your exact location is never stored. It's only used in the moment.
-      </Text>
-
-      <TouchableOpacity
-        style={[styles.btn, loading && styles.btnDisabled]}
-        onPress={handleAllow}
-        disabled={loading}
-      >
-        <Text style={styles.btnText}>{loading ? 'Requesting…' : 'Allow Location'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.replace('/auth/privacy')} style={styles.skip}>
-        <Text style={styles.skipText}>Skip for now</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: Colors.bg },
+  inner: {
     flex: 1,
-    backgroundColor: Colors.bg,
-    padding: 28,
+    paddingHorizontal: Spacing.screenPad + 8,
     justifyContent: 'center',
   },
-  emoji: { fontSize: 64, textAlign: 'center', marginBottom: 20 },
+  iconWrap: { alignItems: 'center', marginBottom: 24 },
+  iconBg: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,0,0.3)',
+  },
+  icon: { fontSize: 40 },
   title: {
     fontFamily: Fonts.headline,
-    fontSize: 48,
+    fontSize: 52,
     color: Colors.primary,
     letterSpacing: 6,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   subtitle: {
-    fontFamily: Fonts.bodySemiBold,
-    fontSize: 16,
-    color: Colors.white,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  points: { gap: 14, marginBottom: 28 },
-  point: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  bullet: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.primary, marginTop: 2 },
-  pointText: { fontFamily: Fonts.body, fontSize: 15, color: Colors.muted, flex: 1, lineHeight: 22 },
-  privacy: {
     fontFamily: Fonts.body,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.3)',
+    fontSize: 16,
+    color: Colors.muted,
     textAlign: 'center',
-    marginBottom: 36,
+    marginBottom: 28,
+  },
+  reasons: { marginBottom: 20 },
+  reason: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    gap: 14,
+  },
+  reasonBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.glassBorder,
+  },
+  reasonIcon: { fontSize: 22, marginTop: 1 },
+  reasonText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    color: Colors.muted,
+    flex: 1,
+    lineHeight: 21,
+  },
+  privacyNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 28,
+    paddingHorizontal: 4,
+  },
+  privacyIcon: { fontSize: 14, marginTop: 1 },
+  privacyText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.mutedLight,
+    flex: 1,
     lineHeight: 18,
   },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.button,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 16,
+  deniedText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    color: Colors.error,
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.white },
-  skip: { alignItems: 'center' },
+  btn: { marginBottom: 14 },
+  skipBtn: { alignItems: 'center', paddingVertical: 8 },
   skipText: { fontFamily: Fonts.body, fontSize: 14, color: Colors.muted },
 });

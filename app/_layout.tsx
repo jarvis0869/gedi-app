@@ -9,6 +9,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -29,14 +30,23 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.bg }}>
-      <StatusBar style="light" />
+      <StatusBar style="light" backgroundColor={Colors.bg} />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: Colors.bg },
           animation: 'slide_from_right',
         }}
-      />
+      >
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+        <Stack.Screen name="auth/phone" options={{ animation: 'fade' }} />
+        <Stack.Screen name="auth/otp" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="auth/location" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="auth/privacy" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="place/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="event/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+      </Stack>
     </GestureHandlerRootView>
   );
 }
