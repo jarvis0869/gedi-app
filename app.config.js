@@ -10,6 +10,7 @@ export default {
   expo: {
     name: 'Gedi',
     slug: 'gedi',
+    owner: 'jarvis0869',
     version: '1.0.0',
     scheme: 'gedi',
     orientation: 'portrait',
