@@ -8,15 +8,12 @@ import {
   View,
 } from 'react-native';
 import Animated, {
-  interpolate,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,7 +31,6 @@ import { FeedCard } from '@/lib/feedMixer';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 const { height } = Dimensions.get('window');
-const PULL_THRESHOLD = 80;
 const TUTORIAL_KEY = '@gedi_tutorial_seen';
 
 export default function FeedScreen() {
@@ -48,10 +44,6 @@ export default function FeedScreen() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const didInit = useRef(false);
-
-  // Pull-to-refresh shared values
-  const pullY = useSharedValue(0);
-  const refreshOpacity = useSharedValue(0);
 
   useNotifications(user?.id);
 
@@ -92,30 +84,6 @@ export default function FeedScreen() {
     await load(true);
     setIsRefreshing(false);
   }, [load]);
-
-  // Pull-down-to-refresh gesture (only activates on downward drag)
-  const pullGesture = Gesture.Pan()
-    .activeOffsetY([10, 1000])
-    .onUpdate((e) => {
-      'worklet';
-      if (e.translationY > 0) {
-        pullY.value = Math.min(e.translationY, PULL_THRESHOLD * 1.5);
-        refreshOpacity.value = interpolate(pullY.value, [0, PULL_THRESHOLD], [0, 1]);
-      }
-    })
-    .onEnd((_e) => {
-      'worklet';
-      if (pullY.value >= PULL_THRESHOLD) {
-        runOnJS(doRefresh)();
-      }
-      pullY.value = withSpring(0, { damping: 18, stiffness: 200 });
-      refreshOpacity.value = withTiming(0, { duration: 200 });
-    });
-
-  const pullIndicatorStyle = useAnimatedStyle(() => ({
-    opacity: refreshOpacity.value,
-    transform: [{ translateY: interpolate(pullY.value, [0, PULL_THRESHOLD], [-20, 0]) }],
-  }));
 
   // Animated counter bounce on index change
   const counterScale = useSharedValue(1);
@@ -176,12 +144,6 @@ export default function FeedScreen() {
         pointerEvents="none"
       />
 
-      {/* Pull-to-refresh indicator — absolute, never intercepts touches */}
-      <Animated.View style={[styles.pullIndicator, pullIndicatorStyle]} pointerEvents="none">
-        <Text style={styles.pullText}>↓ Release to refresh</Text>
-      </Animated.View>
-
-      {/* Header — outside GestureDetector so buttons always receive taps */}
       <View style={styles.header}>
         <View style={styles.logoRow}>
           <Text style={styles.logo}>GEDI</Text>
@@ -207,7 +169,6 @@ export default function FeedScreen() {
         </View>
       </View>
 
-      {/* Counter — absolute, non-interactive */}
       {showStack && (
         <Animated.View style={[styles.counter, counterStyle]}>
           <Text style={styles.counterText}>
@@ -217,15 +178,11 @@ export default function FeedScreen() {
         </Animated.View>
       )}
 
-      {/* Warning toast */}
       {warning && (
         <WarningToast message={warning} onDismiss={() => setWarning(null)} />
       )}
 
-      {/* Content area — GestureDetector only here, away from header buttons */}
-      <GestureDetector gesture={pullGesture}>
-        <View style={styles.content}>
-          {/* Loading */}
+      <View style={styles.content}>
           {loading && (
             <View style={styles.stackArea}>
               <GlowBackground intensity="soft" yOffset={height * 0.46} />
@@ -233,7 +190,6 @@ export default function FeedScreen() {
             </View>
           )}
 
-          {/* Error */}
           {!loading && error && (
             <View style={styles.centered}>
               <Text style={styles.stateEmoji}>⚡</Text>
@@ -245,7 +201,6 @@ export default function FeedScreen() {
             </View>
           )}
 
-          {/* Empty */}
           {isEmpty && (
             <View style={styles.centered}>
               <Text style={styles.stateEmoji}>🌃</Text>
@@ -257,7 +212,6 @@ export default function FeedScreen() {
             </View>
           )}
 
-          {/* All swiped */}
           {allSwiped && (
             <View style={styles.centered}>
               <Text style={styles.stateEmoji}>🎉</Text>
@@ -274,7 +228,6 @@ export default function FeedScreen() {
             </View>
           )}
 
-          {/* Card stack */}
           {showStack && (
             <View style={styles.stackArea}>
               <GlowBackground intensity="soft" yOffset={height * 0.46} />
@@ -284,12 +237,12 @@ export default function FeedScreen() {
                 onSwipeRight={handleSwipeRight}
                 onSwipeLeft={handleSwipeLeft}
                 onSwipeUp={handleSwipeUp}
+                onRefresh={doRefresh}
               />
               <SwipeTutorial visible={showTutorial && topIndex === 0} />
             </View>
           )}
-        </View>
-      </GestureDetector>
+      </View>
     </View>
   );
 }
@@ -297,20 +250,6 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   content: { flex: 1 },
-
-  pullIndicator: {
-    position: 'absolute',
-    top: Spacing.headerTop + 8,
-    alignSelf: 'center',
-    zIndex: 100,
-    backgroundColor: Colors.glass,
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
-    borderRadius: 100,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  pullText: { fontFamily: Fonts.body, fontSize: 12, color: Colors.muted },
 
   header: {
     flexDirection: 'row',

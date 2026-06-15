@@ -1,13 +1,5 @@
-/**
- * CardStack — coordinates swipe animations across the card stack.
- *
- * Top card: user-driven pan gesture with rotation following finger.
- * Cards 1-3 behind: animated in real-time by the top card's translateX,
- * so the stack feels alive while dragging (not just after swipe completes).
- * Haptic feedback fires when crossing the swipe threshold.
- */
-import React from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   interpolate,
   runOnJS,
@@ -36,6 +28,7 @@ export const CARD_HEIGHT = height * 0.72;
 const SWIPE_X = 100;
 const SWIPE_VX = 400;
 const SWIPE_Y = 80;
+const PULL_DOWN = 80;
 const SPRING_BACK = { damping: 20, stiffness: 220, mass: 0.9 };
 
 interface Props {
@@ -44,9 +37,9 @@ interface Props {
   onSwipeRight: (card: FeedCard) => void;
   onSwipeLeft: (card: FeedCard) => void;
   onSwipeUp: (card: FeedCard) => void;
+  onRefresh?: () => void;
 }
 
-// Isolated component so useAnimatedStyle is called at component top-level
 function BackCard({
   card,
   slot,
@@ -79,12 +72,42 @@ function BackCard({
   );
 }
 
-export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeUp }: Props) {
+export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeUp, onRefresh }: Props) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const stampOpacity = useSharedValue(0);
   const stamp = useSharedValue<'going' | 'nah' | null>(null);
   const didCrossThreshold = useSharedValue(false);
+
+  const visible = cards.slice(topIndex, topIndex + 4);
+  const topCard = visible[0];
+  const backCards = visible.slice(1);
+
+  // Reset animation when the card changes (covers button-press swipes)
+  useEffect(() => {
+    translateX.value = 0;
+    translateY.value = 0;
+    stampOpacity.value = 0;
+    stamp.value = null;
+    didCrossThreshold.value = false;
+  }, [topIndex]);
+
+  const handleGoingPress = useCallback(() => {
+    if (!topCard) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSwipeRight(topCard);
+  }, [topCard, onSwipeRight]);
+
+  const handleNahPress = useCallback(() => {
+    if (!topCard) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onSwipeLeft(topCard);
+  }, [topCard, onSwipeLeft]);
+
+  const handleDetailsPress = useCallback(() => {
+    if (!topCard) return;
+    onSwipeUp(topCard);
+  }, [topCard, onSwipeUp]);
 
   const hapticLight = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   const hapticMedium = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -98,6 +121,8 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
   };
 
   const gesture = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .activeOffsetY([-20, 30])
     .onUpdate((e) => {
       'worklet';
       translateX.value = e.translationX;
@@ -131,6 +156,9 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
         e.translationY < -SWIPE_Y &&
         Math.abs(e.translationX) < 60 &&
         e.velocityY < 0;
+      const swipedDown =
+        e.translationY > PULL_DOWN &&
+        Math.abs(e.translationX) < 60;
 
       const card = cards[topIndex];
       didCrossThreshold.value = false;
@@ -140,20 +168,40 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
       if (swipedRight) {
         const speed = Math.max(e.velocityX, 900);
         const dur = Math.min(300, Math.round(1400 / (speed / 400)));
-        translateX.value = withTiming(width * 1.6, { duration: dur });
         stampOpacity.value = withTiming(0, { duration: 180 });
         runOnJS(hapticMedium)();
-        runOnJS(onSwipeRight)(card);
+        // Reset translate BEFORE notifying parent so new card starts at 0
+        translateX.value = withTiming(width * 1.6, { duration: dur }, (finished) => {
+          'worklet';
+          if (finished) {
+            translateX.value = 0;
+            translateY.value = 0;
+            stamp.value = null;
+            didCrossThreshold.value = false;
+            runOnJS(onSwipeRight)(card);
+          }
+        });
       } else if (swipedLeft) {
         const speed = Math.max(-e.velocityX, 900);
         const dur = Math.min(300, Math.round(1400 / (speed / 400)));
-        translateX.value = withTiming(-width * 1.6, { duration: dur });
         stampOpacity.value = withTiming(0, { duration: 180 });
         runOnJS(hapticMedium)();
-        runOnJS(onSwipeLeft)(card);
+        translateX.value = withTiming(-width * 1.6, { duration: dur }, (finished) => {
+          'worklet';
+          if (finished) {
+            translateX.value = 0;
+            translateY.value = 0;
+            stamp.value = null;
+            didCrossThreshold.value = false;
+            runOnJS(onSwipeLeft)(card);
+          }
+        });
       } else if (swipedUp) {
         runOnJS(onSwipeUp)(card);
         resetAnim();
+      } else if (swipedDown) {
+        resetAnim();
+        if (onRefresh) runOnJS(onRefresh)();
       } else {
         resetAnim();
       }
@@ -170,23 +218,18 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
     };
   });
 
-  const visible = cards.slice(topIndex, topIndex + 4);
-  const topCard = visible[0];
-  const backCards = visible.slice(1);
-
   if (!topCard) return null;
 
   return (
     <View style={styles.stack}>
-      {/* Back cards bottom to top (slot 3 first, slot 1 last) */}
       {[...backCards].reverse().map((card, revIdx) => {
-        const slot = backCards.length - revIdx; // slot 1 = directly behind top
+        const slot = backCards.length - revIdx;
         return (
           <BackCard key={card.id} card={card} slot={slot} dragX={translateX} />
         );
       })}
 
-      {/* Top card with gesture */}
+      {/* Top card — swipe gesture lives here */}
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.card, topCardStyle]}>
           {topCard.type === 'place' ? (
@@ -199,6 +242,36 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
           </View>
         </Animated.View>
       </GestureDetector>
+
+      {/* Tappable overlay — same animation as card, outside GestureDetector.
+          pointerEvents="box-none" means the container passes touches through to
+          the GestureDetector below, but the Pressable children still receive taps. */}
+      <Animated.View style={[styles.card, topCardStyle]} pointerEvents="box-none">
+        {/* View Details / View Event bar at the bottom */}
+        <Pressable
+          style={styles.tapBar}
+          onPress={handleDetailsPress}
+          hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+        />
+        {/* Three equal tap zones over the hint row: details | going | nah */}
+        <View style={styles.tapHints} pointerEvents="box-none">
+          <Pressable
+            style={styles.tapSection}
+            onPress={handleDetailsPress}
+            hitSlop={{ top: 10, bottom: 5, left: 8, right: 4 }}
+          />
+          <Pressable
+            style={styles.tapSection}
+            onPress={handleGoingPress}
+            hitSlop={{ top: 10, bottom: 5, left: 4, right: 4 }}
+          />
+          <Pressable
+            style={styles.tapSection}
+            onPress={handleNahPress}
+            hitSlop={{ top: 10, bottom: 5, left: 4, right: 8 }}
+          />
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -220,5 +293,23 @@ const styles = StyleSheet.create({
     elevation: 10,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  tapBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 46,
+  },
+  tapHints: {
+    position: 'absolute',
+    bottom: 46,
+    left: 0,
+    right: 0,
+    height: 40,
+    flexDirection: 'row',
+  },
+  tapSection: {
+    flex: 1,
   },
 });
