@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Pushes all key=value pairs from .env to EAS Environment Variables so they
-# are available during cloud builds without being committed to the repo.
+# Pushes all key=value pairs from .env to EAS Environment Variables.
+# EXPO_PUBLIC_* vars → --visibility plaintext  (required; these are bundled into the client)
+# All other vars     → --visibility sensitive   (hidden in build logs)
 #
 # Usage:
 #   chmod +x scripts/setup-eas-secrets.sh
 #   ./scripts/setup-eas-secrets.sh
 #
-# Requires: eas-cli >= 10.x installed globally (npm i -g eas-cli) and eas login done.
+# Requires: eas-cli >= 10.x (npm i -g eas-cli) and eas login done.
 
 set -euo pipefail
 
 ENV_FILE=".env"
+ENVIRONMENTS=("production" "preview" "development")
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: $ENV_FILE not found. Copy .env.example and fill in real values first."
@@ -18,44 +20,40 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 echo "Reading $ENV_FILE and pushing to EAS Environment Variables..."
+echo "(Project: 30351279-d372-4f69-97f7-015d615fd35e)"
 echo ""
 
 while IFS='=' read -r key value; do
   # Skip comments and empty lines
   [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-  # Strip surrounding quotes from value if present
+
+  # Strip surrounding quotes from value
   value="${value%\"}"
   value="${value#\"}"
   value="${value%\'}"
   value="${value#\'}"
 
-  if [[ -n "$value" ]]; then
-    echo "  Setting: $key"
-    # eas env:create sets a variable for all environments (production/preview/development)
-    eas env:create \
-      --name "$key" \
-      --value "$value" \
-      --environment production \
-      --visibility secret \
-      --force \
-      --non-interactive 2>&1 | grep -v "^$" || true
+  [[ -z "$value" ]] && continue
 
-    eas env:create \
-      --name "$key" \
-      --value "$value" \
-      --environment preview \
-      --visibility secret \
-      --force \
-      --non-interactive 2>&1 | grep -v "^$" || true
-
-    eas env:create \
-      --name "$key" \
-      --value "$value" \
-      --environment development \
-      --visibility secret \
-      --force \
-      --non-interactive 2>&1 | grep -v "^$" || true
+  # EXPO_PUBLIC_ vars must be plaintext — the bundler inlines them into client JS
+  if [[ "$key" == EXPO_PUBLIC_* ]]; then
+    visibility="plaintext"
+  else
+    visibility="sensitive"
   fi
+
+  echo "  [$visibility] $key"
+
+  for env in "${ENVIRONMENTS[@]}"; do
+    eas env:create \
+      --name "$key" \
+      --value "$value" \
+      --environment "$env" \
+      --visibility "$visibility" \
+      --force \
+      --non-interactive 2>&1 | grep -v "^$" || true
+  done
+
 done < "$ENV_FILE"
 
 echo ""
