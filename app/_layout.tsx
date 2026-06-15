@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts, BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
@@ -10,6 +10,8 @@ import {
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
+import { useAuth } from '@/hooks/useAuth';
+import { parseDeepLink, storePendingLink } from '@/lib/deeplink';
 import { Colors } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -21,10 +23,27 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
   });
+  const router = useRouter();
+  const { session } = useAuth();
 
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded]);
+
+  // Listen for incoming deep links while the app is already running (foreground/background)
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      const route = parseDeepLink(url);
+      if (!route) return;
+      if (session) {
+        router.push(route as any);
+      } else {
+        // Store for post-auth redirect
+        storePendingLink(url);
+      }
+    });
+    return () => sub.remove();
+  }, [session]);
 
   if (!fontsLoaded) return null;
 
@@ -46,6 +65,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth/privacy" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="place/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="event/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="+not-found" options={{ animation: 'fade' }} />
       </Stack>
     </GestureHandlerRootView>
   );

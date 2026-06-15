@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "in.gediapp.app",
+      "associatedDomains": ["applinks:gediapp.in"],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Gedi uses your location to show nearby places and verify check-ins.",
         "NSLocationAlwaysUsageDescription": "Gedi uses your location to show nearby places and verify check-ins."
@@ -31,6 +32,17 @@
         "ACCESS_COARSE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "gediapp.in", "pathPrefix": "/place" },
+            { "scheme": "https", "host": "gediapp.in", "pathPrefix": "/event" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
