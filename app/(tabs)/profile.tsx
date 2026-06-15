@@ -13,17 +13,15 @@ import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrivacy, PrivacyMode } from '@/hooks/usePrivacy';
 import { GlassCard } from '@/components/GlassCard';
 import { Colors, Fonts, Radius } from '@/constants/theme';
-
-type PrivacyMode = 'ghost' | 'friends' | 'public';
 
 interface UserProfile {
   phone: string;
   points: number;
   checkins_count: number;
   saves_count: number;
-  privacy_mode: PrivacyMode;
 }
 
 export default function ProfileScreen() {
@@ -31,21 +29,20 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notifEnabled, setNotifEnabled] = useState(true);
+  const { mode: privacyMode, setMode: setPrivacyMode } = usePrivacy(user?.id);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from('users')
-      .select('phone,points,checkins_count,saves_count,privacy_mode')
+      .select('phone,points,checkins_count,saves_count')
       .eq('id', user.id)
       .single()
       .then(({ data }) => { if (data) setProfile(data as UserProfile); });
   }, [user]);
 
   const updatePrivacy = async (mode: PrivacyMode) => {
-    if (!user) return;
-    setProfile((p) => p ? { ...p, privacy_mode: mode } : p);
-    await supabase.from('users').update({ privacy_mode: mode }).eq('id', user.id);
+    await setPrivacyMode(mode);
   };
 
   const handleDeleteAccount = () => {
@@ -114,8 +111,8 @@ export default function ProfileScreen() {
           >
             <Text style={styles.privacyIcon}>{opt.icon}</Text>
             <Text style={styles.privacyLabel}>{opt.label}</Text>
-            <View style={[styles.radio, profile?.privacy_mode === opt.key && styles.radioActive]}>
-              {profile?.privacy_mode === opt.key && <View style={styles.radioDot} />}
+            <View style={[styles.radio, privacyMode === opt.key && styles.radioActive]}>
+              {privacyMode === opt.key && <View style={styles.radioDot} />}
             </View>
           </TouchableOpacity>
         ))}

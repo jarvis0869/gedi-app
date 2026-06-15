@@ -13,9 +13,10 @@ import { Colors, Fonts, Radius } from '@/constants/theme';
 interface Props {
   points: number;
   onDone: () => void;
+  private?: boolean;
 }
 
-export function CheckinSuccess({ points, onDone }: Props) {
+export function CheckinSuccess({ points, onDone, private: isPrivate }: Props) {
   const scale = useSharedValue(0);
   const opacity = useSharedValue(0);
   const checkScale = useSharedValue(0);
@@ -55,7 +56,8 @@ export function CheckinSuccess({ points, onDone }: Props) {
         <Animated.View style={[styles.checkCircle, checkStyle]}>
           <Text style={styles.checkMark}>✓</Text>
         </Animated.View>
-        <Text style={styles.title}>Checked In!</Text>
+        <Text style={styles.title}>{isPrivate ? 'Checked In! 👻' : 'Checked In!'}</Text>
+        {isPrivate && <Text style={styles.privateLabel}>Privately · visible only to you</Text>}
         <Animated.View style={pointsStyle}>
           <Text style={styles.points}>+{points} pts</Text>
         </Animated.View>
@@ -105,5 +107,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: Colors.success,
     letterSpacing: 1,
+  },
+  privateLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    color: Colors.mutedLight,
+    letterSpacing: 0.3,
+    marginTop: -4,
   },
 });

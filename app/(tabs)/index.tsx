@@ -23,6 +23,7 @@ import { useFeed } from '@/hooks/useFeed';
 import { useSaved } from '@/hooks/useSaved';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
+import { usePrivacy } from '@/hooks/usePrivacy';
 import { CardStack } from '@/components/CardStack';
 import { SkeletonStack } from '@/components/SkeletonStack';
 import { GlowBackground } from '@/components/GlowBackground';
@@ -40,6 +41,7 @@ export default function FeedScreen() {
   const { user } = useAuth();
   const { cards, loading, error, warnings, load } = useFeed();
   const { save } = useSaved(user?.id);
+  const { isGhost } = usePrivacy(user?.id);
   const [topIndex, setTopIndex] = useState(0);
   const [warning, setWarning] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -181,7 +183,14 @@ export default function FeedScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logo}>GEDI</Text>
+          <View style={styles.logoRow}>
+            <Text style={styles.logo}>GEDI</Text>
+            {isGhost && (
+              <View style={styles.ghostBadge}>
+                <Text style={styles.ghostBadgeText}>👻 Ghost</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.headerRight}>
             <View style={styles.locationPill}>
               <View style={styles.greenDot} />
@@ -308,6 +317,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     zIndex: 1,
   },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  ghostBadge: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  ghostBadgeText: { fontFamily: Fonts.body, fontSize: 11, color: Colors.mutedLight },
   logo: {
     fontFamily: Fonts.headline,
     fontSize: 26,

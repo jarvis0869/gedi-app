@@ -20,6 +20,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchPlaceDetails, PlaceDetail } from '@/lib/places';
 import { useCheckin, CheckinResult, CHECKIN_RADIUS_METERS, formatDistance } from '@/hooks/useCheckin';
 import { useAuth } from '@/hooks/useAuth';
+import { usePrivacy } from '@/hooks/usePrivacy';
 import { CheckinSuccess } from '@/components/CheckinSuccess';
 import { CheckinFeedback } from '@/components/CheckinFeedback';
 import { GlassCard } from '@/components/GlassCard';
@@ -67,6 +68,7 @@ export default function PlaceDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { checkin, loading: checkinLoading, result, distanceToPlace, clearResult } = useCheckin(user?.id);
+  const { isGhost } = usePrivacy(user?.id);
   const [place, setPlace] = useState<PlaceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -156,7 +158,7 @@ export default function PlaceDetailScreen() {
   return (
     <View style={styles.container}>
       {showSuccess && (
-        <CheckinSuccess points={10} onDone={() => setShowSuccess(false)} />
+        <CheckinSuccess points={10} onDone={() => setShowSuccess(false)} private={isGhost} />
       )}
       {feedbackResult && (
         <CheckinFeedback
@@ -372,7 +374,9 @@ export default function PlaceDetailScreen() {
             {checkinLoading ? (
               <ActivityIndicator color={Colors.success} size="small" />
             ) : (
-              <Text style={styles.checkinText}>📍 Check In  ·  +10 pts</Text>
+              <Text style={styles.checkinText}>
+                {isGhost ? '👻 Check In Privately  ·  +10 pts' : '📍 Check In  ·  +10 pts'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
