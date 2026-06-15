@@ -69,12 +69,12 @@ export const Shadow = {
 };
 
 export const Gradients = {
-  cardOverlay: ['transparent', 'rgba(26,22,40,0.6)', 'rgba(18,15,30,0.98)'] as string[],
-  cardOverlayLight: ['transparent', 'rgba(26,22,40,0.4)', 'rgba(18,15,30,0.92)'] as string[],
-  primaryBtn: ['#FF8C00', '#FF6B00'] as string[],
-  glow: ['rgba(255,107,0,0.2)', 'transparent'] as string[],
-  bgTop: ['rgba(255,107,0,0.06)', '#1A1628'] as string[],
-  dark: ['rgba(18,15,30,0)', 'rgba(18,15,30,0.98)'] as string[],
+  cardOverlay: ['transparent', 'rgba(26,22,40,0.6)', 'rgba(18,15,30,0.98)'] as const,
+  cardOverlayLight: ['transparent', 'rgba(26,22,40,0.4)', 'rgba(18,15,30,0.92)'] as const,
+  primaryBtn: ['#FF8C00', '#FF6B00'] as const,
+  glow: ['rgba(255,107,0,0.2)', 'transparent'] as const,
+  bgTop: ['rgba(255,107,0,0.06)', '#1A1628'] as const,
+  dark: ['rgba(18,15,30,0)', 'rgba(18,15,30,0.98)'] as const,
 };
 
 export const Spacing = {

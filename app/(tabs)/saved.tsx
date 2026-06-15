@@ -194,4 +194,7 @@ const styles = StyleSheet.create({
   placeBadge: { backgroundColor: 'rgba(255,107,0,0.2)' },
   eventBadge: { backgroundColor: 'rgba(100,100,255,0.2)' },
   typeBadgeText: { fontFamily: Fonts.bodyBold, fontSize: 9, color: Colors.muted, letterSpacing: 1 },
+  empty: { flex: 1, justifyContent: 'center' as const, alignItems: 'center' as const, gap: 10 },
+  emptyEmoji: { fontSize: 48, color: Colors.muted },
+  emptyText: { fontFamily: Fonts.body, fontSize: 15, color: Colors.muted, textAlign: 'center' as const, lineHeight: 22 },
 });
