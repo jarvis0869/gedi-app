@@ -4,55 +4,94 @@ import { fetchEventbriteEvents, EventbriteCard } from './eventbrite';
 
 export type FeedCard = PlaceCard | EventCard | EventbriteCard;
 
-function deduplicateByName(cards: (EventCard | EventbriteCard)[]): (EventCard | EventbriteCard)[] {
+// Deduplicate events by normalised title
+function dedupeEvents(cards: (EventCard | EventbriteCard)[]): (EventCard | EventbriteCard)[] {
   const seen = new Set<string>();
   return cards.filter((c) => {
-    const key = c.title.toLowerCase().trim();
+    const key = c.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
+function parseEventDate(c: EventCard | EventbriteCard): number {
+  const raw = c.source === 'eventbrite'
+    ? (c as EventbriteCard).start
+    : (c as EventCard).date;
+  if (!raw) return Infinity;
+  const ms = Date.parse(raw);
+  return isNaN(ms) ? Infinity : ms;
+}
+
+// Interleave: no more than 2 places in a row before an event
 function interleave(places: PlaceCard[], events: (EventCard | EventbriteCard)[]): FeedCard[] {
   const result: FeedCard[] = [];
   let pi = 0;
   let ei = 0;
-  let consecutivePlaces = 0;
+  let run = 0;
 
   while (pi < places.length || ei < events.length) {
-    if (consecutivePlaces >= 2 && ei < events.length) {
+    if (run >= 2 && ei < events.length) {
       result.push(events[ei++]);
-      consecutivePlaces = 0;
+      run = 0;
     } else if (pi < places.length) {
       result.push(places[pi++]);
-      consecutivePlaces++;
+      run++;
     } else {
       result.push(events[ei++]);
-      consecutivePlaces = 0;
+      run = 0;
     }
   }
+
   return result;
 }
 
-export async function buildFeed(): Promise<FeedCard[]> {
-  const [places, serpEvents, ebEvents] = await Promise.allSettled([
+export interface FeedResult {
+  cards: FeedCard[];
+  errors: { source: string; message: string }[];
+}
+
+export async function buildFeed(): Promise<FeedResult> {
+  const [placesResult, serpResult, ebResult] = await Promise.allSettled([
     fetchNearbyPlaces(),
     fetchSerpEvents(),
     fetchEventbriteEvents(),
   ]);
 
-  const resolvedPlaces = places.status === 'fulfilled' ? places.value : [];
-  const resolvedSerp = serpEvents.status === 'fulfilled' ? serpEvents.value : [];
-  const resolvedEb = ebEvents.status === 'fulfilled' ? ebEvents.value : [];
+  const errors: { source: string; message: string }[] = [];
 
-  const allEvents = deduplicateByName([...resolvedSerp, ...resolvedEb]);
+  const places = placesResult.status === 'fulfilled'
+    ? placesResult.value
+    : (errors.push({ source: 'Google Places', message: (placesResult.reason as Error)?.message }), []);
 
-  allEvents.sort((a, b) => {
-    const dateA = new Date(a.type === 'event' && a.source === 'eventbrite' ? (a as EventbriteCard).start : (a as EventCard).date).getTime();
-    const dateB = new Date(b.type === 'event' && b.source === 'eventbrite' ? (b as EventbriteCard).start : (b as EventCard).date).getTime();
-    return dateA - dateB;
-  });
+  const serpEvents = serpResult.status === 'fulfilled'
+    ? serpResult.value
+    : (errors.push({ source: 'SerpAPI', message: (serpResult.reason as Error)?.message }), []);
 
-  return interleave(resolvedPlaces, allEvents);
+  const ebEvents = ebResult.status === 'fulfilled'
+    ? ebResult.value
+    : (errors.push({ source: 'Eventbrite', message: (ebResult.reason as Error)?.message }), []);
+
+  // Prefer Eventbrite events (richer data), then SerpAPI
+  const allEvents = dedupeEvents([...ebEvents, ...serpEvents]);
+
+  // Sort events by soonest first, filter out past events
+  const now = Date.now();
+  const upcomingEvents = allEvents
+    .filter((e) => parseEventDate(e) >= now - 3 * 60 * 60 * 1000) // allow events up to 3h ago
+    .sort((a, b) => parseEventDate(a) - parseEventDate(b));
+
+  const cards = interleave(places, upcomingEvents);
+
+  return { cards, errors };
+}
+
+export function invalidateAllCaches() {
+  const { invalidateNearbyCache } = require('./places');
+  const { invalidateSerpCache } = require('./events');
+  const { invalidateEventbriteCache } = require('./eventbrite');
+  invalidateNearbyCache();
+  invalidateSerpCache();
+  invalidateEventbriteCache();
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Linking,
   ScrollView,
@@ -9,123 +10,192 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Fonts, Radius } from '@/constants/theme';
+import { getCachedEvent } from '@/lib/eventCache';
+import { EventCard } from '@/lib/events';
+import { EventbriteCard } from '@/lib/eventbrite';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
-const SAVED_EVENTS_KEY = '@gedi_event_cache';
+
+type AnyEvent = EventCard | EventbriteCard;
+
+function formatDate(raw: string): string {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+}
+
+function formatTime(raw: string): string {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [event, setEvent] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<AnyEvent | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    loadEvent();
+    if (!id) return;
+    const cached = getCachedEvent(id);
+    if (cached && cached.type === 'event') {
+      setEvent(cached as AnyEvent);
+    } else {
+      setNotFound(true);
+    }
   }, [id]);
 
-  const loadEvent = async () => {
-    try {
-      const raw = await AsyncStorage.getItem(SAVED_EVENTS_KEY);
-      const cache = raw ? JSON.parse(raw) : {};
-      if (cache[id!]) { setEvent(cache[id!]); }
-    } catch {}
-    setLoading(false);
-  };
-
-  const handleTickets = () => {
-    const url = event?.url || event?.link;
-    if (url) Linking.openURL(url);
-  };
-
-  const handleShare = async () => {
-    await Share.share({
-      message: `Check out ${event?.title || event?.name} on Gedi!`,
-      url: `gedi://event/${id}`,
-    });
-  };
-
-  const title = event?.title || event?.name || 'Event';
-  const description = event?.description || '';
-  const thumbnail = event?.thumbnail || event?.logo || '';
-  const venue = event?.venue || '';
-  const dateStr = event?.date || event?.start || '';
-  const timeStr = event?.time || '';
-  const isFree = event?.is_free;
-  const ticketPrice = event?.ticket_price;
-  const ticketUrl = event?.url || event?.link;
-
-  if (loading) {
+  if (!event && !notFound) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.loading}>
         <ActivityIndicator color={Colors.primary} size="large" />
       </View>
     );
   }
 
+  if (notFound || !event) {
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.notFoundText}>Event not found</Text>
+        <TouchableOpacity style={styles.backFab} onPress={() => router.back()}>
+          <Text style={styles.backFabText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const isEb = event.source === 'eventbrite';
+  const eb = event as EventbriteCard;
+  const serp = event as EventCard;
+
+  const title = isEb ? eb.title : serp.title;
+  const description = isEb ? eb.description : serp.description;
+  const thumbnail = isEb ? eb.logo : serp.thumbnail;
+  const venue = isEb ? eb.venue : serp.venue;
+  const venueAddress = isEb ? eb.venue_address : undefined;
+  const rawDate = isEb ? eb.start : serp.date;
+  const rawTime = isEb ? eb.start : serp.time;
+  const isFree = isEb ? eb.is_free : null;
+  const ticketPrice = isEb ? eb.ticket_price : undefined;
+  const ticketUrl = isEb ? eb.url : serp.url;
+
+  const dateLabel = isEb ? formatDate(rawDate) : rawDate;
+  const timeLabel = isEb ? formatTime(rawTime) : rawTime;
+
+  const handleTickets = () => {
+    if (ticketUrl) Linking.openURL(ticketUrl);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        title,
+        message: `Check out "${title}" on Gedi!\ngediapp.in/event/${id}`,
+        url: `gedi://event/${id}`,
+      });
+    } catch {}
+  };
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Text style={styles.backText}>←</Text>
+      <TouchableOpacity style={styles.backFab} onPress={() => router.back()}>
+        <Text style={styles.backFabText}>←</Text>
       </TouchableOpacity>
 
       <ScrollView bounces showsVerticalScrollIndicator={false}>
         {thumbnail ? (
           <Image source={{ uri: thumbnail }} style={styles.cover} resizeMode="cover" />
         ) : (
-          <View style={[styles.cover, styles.coverFallback]}>
+          <LinearGradient
+            colors={['rgba(255,107,0,0.12)', 'rgba(18,15,30,0.95)']}
+            style={styles.coverFallback}
+          >
             <Text style={styles.coverEmoji}>🎉</Text>
-          </View>
+          </LinearGradient>
         )}
 
+        <LinearGradient
+          colors={['transparent', Colors.bg]}
+          style={styles.coverGradient}
+          pointerEvents="none"
+        />
+
         <View style={styles.content}>
-          {isFree !== undefined && isFree !== null && (
-            <View style={[styles.priceBadge, isFree ? styles.freeBadge : styles.paidBadge]}>
-              <Text style={styles.priceBadgeText}>{isFree ? 'FREE' : ticketPrice || 'TICKETED'}</Text>
+          <View style={styles.pillRow}>
+            <View style={styles.eventPill}>
+              <Text style={styles.eventPillText}>EVENT</Text>
             </View>
-          )}
+            {isFree !== null && (
+              <View style={[styles.pricePill, isFree ? styles.freePill : styles.paidPill]}>
+                <Text style={styles.pricePillText}>
+                  {isFree ? 'FREE' : ticketPrice ?? 'TICKETED'}
+                </Text>
+              </View>
+            )}
+            {isEb && (
+              <View style={styles.sourcePill}>
+                <Text style={styles.sourcePillText}>Eventbrite</Text>
+              </View>
+            )}
+          </View>
 
           <Text style={styles.title}>{title}</Text>
 
           <View style={styles.infoBlock}>
-            {!!dateStr && (
+            {!!dateLabel && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>📅</Text>
-                <Text style={styles.infoText}>{dateStr}{timeStr ? `  ·  ${timeStr}` : ''}</Text>
+                <Text style={styles.infoText}>
+                  {dateLabel}{timeLabel && timeLabel !== dateLabel ? `  ·  ${timeLabel}` : ''}
+                </Text>
               </View>
             )}
             {!!venue && (
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>📍</Text>
-                <Text style={styles.infoText}>{venue}</Text>
+                <View>
+                  <Text style={styles.infoText}>{venue}</Text>
+                  {!!venueAddress && (
+                    <Text style={styles.infoSubText}>{venueAddress}</Text>
+                  )}
+                </View>
               </View>
             )}
           </View>
 
           {!!description && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ABOUT</Text>
+              <Text style={styles.sectionTitle}>ABOUT THIS EVENT</Text>
               <Text style={styles.description}>{description}</Text>
             </View>
           )}
 
           <View style={styles.actions}>
-            {ticketUrl ? (
-              <TouchableOpacity style={styles.actionBtn} onPress={handleTickets}>
-                <Text style={styles.actionBtnText}>
-                  {isFree ? 'Register Free' : 'Get Tickets'}
-                </Text>
+            {!!ticketUrl && (
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleTickets} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={['#FF8C00', '#FF6B00']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.primaryBtnInner}
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {isFree ? '🎫 Register Free' : '🎫 Get Tickets'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnSecondary]}
-              onPress={handleShare}
-            >
-              <Text style={styles.actionBtnSecondaryText}>Share</Text>
+            )}
+            <TouchableOpacity style={styles.secondaryBtn} onPress={handleShare} activeOpacity={0.7}>
+              <Text style={styles.secondaryBtnText}>Share</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -136,46 +206,88 @@ export default function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  loadingContainer: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center' },
-  backBtn: {
+  loading: {
+    flex: 1,
+    backgroundColor: Colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  notFoundText: {
+    fontFamily: Fonts.bodySemiBold,
+    fontSize: 16,
+    color: Colors.muted,
+  },
+  backFab: {
     position: 'absolute',
     top: 52,
     left: 16,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(26,22,40,0.8)',
+    zIndex: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(26,22,40,0.85)',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backText: { fontSize: 20, color: Colors.white },
-  cover: { width, height: width * 0.65 },
-  coverFallback: { backgroundColor: 'rgba(255,107,0,0.1)', justifyContent: 'center', alignItems: 'center' },
-  coverEmoji: { fontSize: 100 },
-  content: { padding: 20, paddingBottom: 48 },
-  priceBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 100,
-    marginBottom: 14,
+  backFabText: { fontSize: 18, color: Colors.white },
+  cover: { width, height: width * 0.62 },
+  coverFallback: {
+    width,
+    height: width * 0.62,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  freeBadge: { backgroundColor: 'rgba(0,200,81,0.15)', borderWidth: 1, borderColor: '#00C851' },
-  paidBadge: { backgroundColor: 'rgba(255,107,0,0.12)', borderWidth: 1, borderColor: Colors.primary },
-  priceBadgeText: { fontFamily: Fonts.bodyBold, fontSize: 12, color: Colors.white, letterSpacing: 1 },
+  coverEmoji: { fontSize: 90 },
+  coverGradient: {
+    position: 'absolute',
+    top: width * 0.35,
+    left: 0,
+    right: 0,
+    height: width * 0.3,
+  },
+  content: { padding: Spacing.screenPad, paddingBottom: 60 },
+  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+  eventPill: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+  },
+  eventPillText: { fontFamily: Fonts.bodyBold, fontSize: 10, color: Colors.white, letterSpacing: 1.5 },
+  pricePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
+  freePill: { backgroundColor: Colors.successDim, borderColor: Colors.success },
+  paidPill: { backgroundColor: Colors.primaryDim, borderColor: Colors.primary },
+  pricePillText: { fontFamily: Fonts.bodyBold, fontSize: 10, color: Colors.white, letterSpacing: 1 },
+  sourcePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    backgroundColor: Colors.glass,
+  },
+  sourcePillText: { fontFamily: Fonts.body, fontSize: 10, color: Colors.muted, letterSpacing: 0.5 },
   title: {
     fontFamily: Fonts.headline,
     fontSize: 38,
     color: Colors.white,
     letterSpacing: 1,
-    lineHeight: 42,
+    lineHeight: 44,
     marginBottom: 20,
   },
-  infoBlock: { gap: 10, marginBottom: 24 },
-  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  infoIcon: { fontSize: 16, marginTop: 1 },
+  infoBlock: { gap: 12, marginBottom: 28 },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  infoIcon: { fontSize: 16, marginTop: 2 },
   infoText: { fontFamily: Fonts.body, fontSize: 15, color: Colors.muted, flex: 1, lineHeight: 22 },
+  infoSubText: { fontFamily: Fonts.body, fontSize: 13, color: Colors.mutedLight, marginTop: 2 },
   section: { marginBottom: 28 },
   sectionTitle: {
     fontFamily: Fonts.bodySemiBold,
@@ -183,22 +295,26 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  description: { fontFamily: Fonts.body, fontSize: 15, color: Colors.muted, lineHeight: 24 },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  actionBtn: {
-    flex: 1,
-    backgroundColor: Colors.primary,
+  description: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.muted,
+    lineHeight: 24,
+  },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  primaryBtn: { flex: 1, borderRadius: Radius.button, overflow: 'hidden' },
+  primaryBtnInner: { paddingVertical: 15, alignItems: 'center' },
+  primaryBtnText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.white },
+  secondaryBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderRadius: Radius.button,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  actionBtnText: { fontFamily: Fonts.bodySemiBold, fontSize: 14, color: Colors.white },
-  actionBtnSecondary: {
-    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: Colors.glassBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  actionBtnSecondaryText: { fontFamily: Fonts.bodySemiBold, fontSize: 14, color: Colors.muted },
+  secondaryBtnText: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.muted },
 });

@@ -24,7 +24,7 @@ const { height } = Dimensions.get('window');
 
 export default function FeedScreen() {
   const { user } = useAuth();
-  const { cards, loading, error, load, setCards } = useFeed();
+  const { cards, loading, error, warnings, load, setCards } = useFeed();
   const { save } = useSaved(user?.id);
   const [topIndex, setTopIndex] = useState(0);
 
