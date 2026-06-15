@@ -156,7 +156,7 @@ export default function FeedScreen() {
 
   const handleSwipeUp = useCallback((card: FeedCard) => {
     if (card.type === 'place') {
-      router.push(`/place/${(card as any).place_id}`);
+      router.push(`/place/${card.id}`);
     } else {
       router.push(`/event/${card.id}`);
     }

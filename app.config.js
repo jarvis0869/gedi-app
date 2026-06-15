@@ -4,7 +4,7 @@
 //
 // Fill in EAS_PROJECT_ID after running: eas project:init
 
-const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID || 'YOUR_EAS_PROJECT_ID';
+const EAS_PROJECT_ID = process.env.EAS_PROJECT_ID || 'ad0c86b2-d407-4798-922f-5cf5a4054941';
 
 export default {
   expo: {

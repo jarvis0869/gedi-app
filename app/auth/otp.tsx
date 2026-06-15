@@ -60,6 +60,13 @@ export default function OTPScreen() {
   const otp = digits.join('');
   const isComplete = otp.length === OTP_LENGTH;
 
+  // Auto-submit when all 6 digits are filled
+  useEffect(() => {
+    if (isComplete && !loading) {
+      handleVerify();
+    }
+  }, [isComplete]);
+
   const handleVerify = async () => {
     if (!isComplete) return;
     setLoading(true);

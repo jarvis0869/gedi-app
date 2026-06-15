@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { buildFeed, FeedCard } from '@/lib/feedMixer';
+import { buildFeed, invalidateAllCaches, FeedCard } from '@/lib/feedMixer';
 import { cacheFeed } from '@/lib/eventCache';
 
 export function useFeed() {
@@ -14,7 +14,6 @@ export function useFeed() {
     setWarnings([]);
     try {
       if (bust) {
-        const { invalidateAllCaches } = await import('@/lib/feedMixer');
         invalidateAllCaches();
       }
       const { cards: feed, errors } = await buildFeed();

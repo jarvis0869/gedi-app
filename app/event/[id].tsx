@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getCachedEvent } from '@/lib/eventCache';
+import { getCachedEvent, cacheFeed } from '@/lib/eventCache';
+import { buildFeed } from '@/lib/feedMixer';
 import { EventCard } from '@/lib/events';
 import { EventbriteCard } from '@/lib/eventbrite';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -43,21 +44,36 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const [event, setEvent] = useState<AnyEvent | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const cached = getCachedEvent(id);
     if (cached && cached.type === 'event') {
       setEvent(cached as AnyEvent);
-    } else {
-      setNotFound(true);
+      return;
     }
+    // Cold-launch: cache is empty — load the feed in background then retry
+    setFeedLoading(true);
+    buildFeed().then(({ cards }) => {
+      cacheFeed(cards);
+      const found = getCachedEvent(id);
+      if (found && found.type === 'event') {
+        setEvent(found as AnyEvent);
+      } else {
+        setNotFound(true);
+      }
+    }).catch(() => setNotFound(true))
+      .finally(() => setFeedLoading(false));
   }, [id]);
 
   if (!event && !notFound) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={Colors.primary} size="large" />
+        {feedLoading && (
+          <Text style={styles.notFoundText}>Loading events…</Text>
+        )}
       </View>
     );
   }
@@ -65,9 +81,14 @@ export default function EventDetailScreen() {
   if (notFound || !event) {
     return (
       <View style={styles.loading}>
-        <Text style={styles.notFoundText}>Event not found</Text>
+        <Text style={styles.notFoundEmoji}>🎉</Text>
+        <Text style={styles.notFoundText}>Event not available</Text>
+        <Text style={styles.notFoundSub}>This event may have ended or been removed.</Text>
+        <TouchableOpacity style={styles.feedBtn} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.feedBtnText}>Browse Tonight's Events</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.backFab} onPress={() => router.back()}>
-          <Text style={styles.backFabText}>← Back</Text>
+          <Text style={styles.backFabText}>←</Text>
         </TouchableOpacity>
       </View>
     );
@@ -213,11 +234,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  notFoundEmoji: { fontSize: 52, marginBottom: 4 },
   notFoundText: {
     fontFamily: Fonts.bodySemiBold,
     fontSize: 16,
     color: Colors.muted,
   },
+  notFoundSub: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    color: Colors.mutedLight,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  feedBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 100,
+    marginTop: 4,
+  },
+  feedBtnText: { fontFamily: Fonts.bodySemiBold, fontSize: 14, color: Colors.white },
   backFab: {
     position: 'absolute',
     top: 52,
