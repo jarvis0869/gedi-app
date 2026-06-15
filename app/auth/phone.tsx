@@ -6,20 +6,38 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { GlowBackground } from '@/components/GlowBackground';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function PhoneScreen() {
   const router = useRouter();
+  const { markOnboarded } = useAuth();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleDevSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: err } = await supabase.auth.signInAnonymously();
+      if (err) throw err;
+      if (data.user) await markOnboarded(data.user.id);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      setError(e?.message ?? 'Dev sign-in failed — enable Anonymous sign-ins in Supabase dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSendOTP = async () => {
     const digits = phone.replace(/\D/g, '');
@@ -88,6 +106,24 @@ export default function PhoneScreen() {
           <Text style={styles.disclaimer}>
             One-time code sent via SMS. No passwords ever.
           </Text>
+
+          {__DEV__ && (
+            <>
+              <View style={styles.devDivider}>
+                <View style={styles.devLine} />
+                <Text style={styles.devDividerText}>DEV ONLY</Text>
+                <View style={styles.devLine} />
+              </View>
+              <TouchableOpacity
+                style={styles.devBtn}
+                onPress={handleDevSignIn}
+                disabled={loading}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.devBtnText}>⚡ Skip Auth (Dev Only)</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -165,5 +201,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     lineHeight: 18,
+  },
+  devDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 32,
+    marginBottom: 14,
+  },
+  devLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+  devDividerText: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    color: Colors.mutedLight,
+    letterSpacing: 2,
+  },
+  devBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    borderRadius: Radius.button,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  devBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    color: Colors.mutedLight,
   },
 });
