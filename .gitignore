@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.DS_Store
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env.local
+service-account-key.json
+ios/
+android/
