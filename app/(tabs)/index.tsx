@@ -172,7 +172,7 @@ export default function FeedScreen() {
         <LinearGradient
           colors={['rgba(255,107,0,0.055)', Colors.bg]}
           locations={[0, 0.45]}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
 

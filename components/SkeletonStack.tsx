@@ -81,7 +81,7 @@ function SkeletonSingle({ scale = 1, ty = 0, opacity = 1, delay = 0 }) {
           colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.03)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
       </View>
       <View style={styles.contentArea}>

@@ -95,6 +95,10 @@ export default {
         },
       ],
       'expo-updates',
+      'expo-font',
+      'expo-splash-screen',
+      'expo-status-bar',
+      'expo-web-browser',
     ],
 
     experiments: {

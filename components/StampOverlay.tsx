@@ -1,11 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import { Fonts } from '@/constants/theme';
 
 interface Props {
   type: 'going' | 'nah' | null;
-  opacity: Animated.SharedValue<number>;
+  opacity: SharedValue<number>;
 }
 
 export function StampOverlay({ type, opacity }: Props) {

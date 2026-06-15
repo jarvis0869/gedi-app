@@ -33,7 +33,7 @@ export function GlowBackground({ intensity = 'soft', yOffset = height * 0.3 }: P
     >
       <LinearGradient
         colors={['#FF6B00', 'transparent']}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
       />

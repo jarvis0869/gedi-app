@@ -15,6 +15,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  SharedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -53,7 +54,7 @@ function BackCard({
 }: {
   card: FeedCard;
   slot: number;
-  dragX: Animated.SharedValue<number>;
+  dragX: SharedValue<number>;
 }) {
   const style = useAnimatedStyle(() => {
     const progress = Math.min(Math.abs(dragX.value) / SWIPE_X, 1);
@@ -193,7 +194,7 @@ export function CardStack({ cards, topIndex, onSwipeRight, onSwipeLeft, onSwipeU
           ) : (
             <EventCardView card={topCard as AnyEvent} />
           )}
-          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
             <StampOverlay type={stamp.value} opacity={stampOpacity} />
           </View>
         </Animated.View>
