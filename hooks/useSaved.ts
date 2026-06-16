@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FeedCard } from '@/lib/feedMixer';
+import { track } from '@/lib/analytics';
 
 export interface SavedItem {
   id: string;
@@ -8,6 +9,17 @@ export interface SavedItem {
   place_type: 'place' | 'event';
   place_data: FeedCard;
   saved_at: string;
+}
+
+async function syncSavesCount(userId: string) {
+  const { count } = await supabase
+    .from('saves')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  await supabase
+    .from('users')
+    .update({ saves_count: count ?? 0 })
+    .eq('id', userId);
 }
 
 export function useSaved(userId: string | undefined) {
@@ -37,13 +49,16 @@ export function useSaved(userId: string | undefined) {
       place_type: card.type,
       place_data: card,
     });
-    await supabase.from('users').update({ saves_count: saved.length + 1 }).eq('id', userId);
+    await syncSavesCount(userId);
+    track('save', { card_type: card.type, place_id: placeId });
     await load();
   };
 
   const unsave = async (placeId: string) => {
     if (!userId) return;
     await supabase.from('saves').delete().eq('user_id', userId).eq('place_id', placeId);
+    await syncSavesCount(userId);
+    track('unsave', { place_id: placeId });
     await load();
   };
 

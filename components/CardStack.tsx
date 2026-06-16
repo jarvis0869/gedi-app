@@ -19,6 +19,8 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { FeedCard } from '@/lib/feedMixer';
+import { useLocation } from '@/hooks/useLocation';
+import { track } from '@/lib/analytics';
 import { PlaceCard as PlaceCardType } from '@/lib/places';
 import { EventCard as SerpEvent } from '@/lib/events';
 import { EventbriteCard } from '@/lib/eventbrite';
@@ -48,12 +50,16 @@ interface Props {
 function ScrollCard({
   card,
   pageHeight,
+  userLat,
+  userLng,
   onGoing,
   onNah,
   onDetails,
 }: {
   card: FeedCard;
   pageHeight: number;
+  userLat?: number;
+  userLng?: number;
   onGoing: () => void;
   onNah: () => void;
   onDetails: () => void;
@@ -143,7 +149,7 @@ function ScrollCard({
       <GestureDetector gesture={gesture}>
         <Animated.View style={[StyleSheet.absoluteFill, cardStyle]}>
           {card.type === 'place' ? (
-            <PlaceCardView card={card as PlaceCardType} />
+            <PlaceCardView card={card as PlaceCardType} userLat={userLat} userLng={userLng} />
           ) : (
             <EventCardView card={card as AnyEvent} />
           )}
@@ -187,6 +193,7 @@ export function CardStack({
   const flatListRef = useRef<FlatList>(null);
   const [pageHeight, setPageHeight] = useState(0);
   const currentIndexRef = useRef(0);
+  const userLocation = useLocation();
 
   // Scroll to top when parent signals a reset (e.g., after refresh)
   useEffect(() => {
@@ -230,12 +237,14 @@ export function CardStack({
       <ScrollCard
         card={item}
         pageHeight={pageHeight}
-        onGoing={() => { onSwipeRight(item); scrollToNext(); }}
-        onNah={() => { onSwipeLeft(item); scrollToNext(); }}
-        onDetails={() => onSwipeUp(item)}
+        userLat={userLocation?.lat}
+        userLng={userLocation?.lng}
+        onGoing={() => { track('card_swipe_right', { card_id: item.id, card_type: item.type }); onSwipeRight(item); scrollToNext(); }}
+        onNah={() => { track('card_swipe_left', { card_id: item.id, card_type: item.type }); onSwipeLeft(item); scrollToNext(); }}
+        onDetails={() => { track('card_swipe_up', { card_id: item.id, card_type: item.type }); onSwipeUp(item); }}
       />
     ),
-    [pageHeight, onSwipeRight, onSwipeLeft, onSwipeUp, scrollToNext]
+    [pageHeight, userLocation, onSwipeRight, onSwipeLeft, onSwipeUp, scrollToNext]
   );
 
   const ListFooter = useCallback(() => (

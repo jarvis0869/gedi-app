@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   Pressable,
@@ -24,14 +24,26 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { usePrivacy } from '@/hooks/usePrivacy';
 import { CardStack } from '@/components/CardStack';
 import { SkeletonStack } from '@/components/SkeletonStack';
+import { track } from '@/lib/analytics';
 import { GlowBackground } from '@/components/GlowBackground';
 import { WarningToast } from '@/components/WarningToast';
 import { SwipeTutorial } from '@/components/SwipeTutorial';
 import { FeedCard } from '@/lib/feedMixer';
+import { PlaceCard } from '@/lib/places';
+import { EventbriteCard } from '@/lib/eventbrite';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 const { height } = Dimensions.get('window');
 const TUTORIAL_KEY = '@gedi_tutorial_seen';
+
+type FeedFilter = 'all' | 'places' | 'events' | 'open' | 'free';
+const FILTERS: { key: FeedFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'places', label: 'Places' },
+  { key: 'events', label: 'Events' },
+  { key: 'open', label: 'Open Now' },
+  { key: 'free', label: 'Free' },
+];
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -43,6 +55,7 @@ export default function FeedScreen() {
   const [warning, setWarning] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FeedFilter>('all');
   const didInit = useRef(false);
 
   useNotifications(user?.id);
@@ -52,7 +65,7 @@ export default function FeedScreen() {
     useCallback(() => {
       if (!didInit.current) {
         didInit.current = true;
-        load(false);
+        load(false).then(() => track('feed_load', { trigger: 'initial' }));
         checkTutorial();
       }
     }, [])
@@ -82,6 +95,7 @@ export default function FeedScreen() {
     setIsRefreshing(true);
     setTopIndex(0);
     await load(true);
+    track('feed_load', { trigger: 'refresh' });
     setIsRefreshing(false);
   }, [load]);
 
@@ -128,7 +142,29 @@ export default function FeedScreen() {
     }
   }, [router]);
 
-  const isEmpty = !loading && !error && cards.length === 0;
+  const filteredCards = useMemo(() => {
+    switch (filter) {
+      case 'places':
+        return cards.filter((c) => c.type === 'place');
+      case 'events':
+        return cards.filter((c) => c.type === 'event');
+      case 'open':
+        return cards.filter((c) => {
+          if (c.type === 'place') return (c as PlaceCard).opening_hours?.open_now === true;
+          return true;
+        });
+      case 'free':
+        return cards.filter((c) => {
+          if (c.type !== 'event') return true;
+          const eb = c as EventbriteCard;
+          return eb.source !== 'eventbrite' || eb.is_free === true;
+        });
+      default:
+        return cards;
+    }
+  }, [cards, filter]);
+
+  const isEmpty = !loading && !error && filteredCards.length === 0;
   const showStack = !loading && !error && !isEmpty;
 
   return (
@@ -169,10 +205,29 @@ export default function FeedScreen() {
         <Animated.View style={[styles.counter, counterStyle]}>
           <Text style={styles.counterText}>
             {topIndex + 1}
-            <Text style={styles.counterOf}> / {cards.length}</Text>
+            <Text style={styles.counterOf}> / {filteredCards.length}</Text>
           </Text>
         </Animated.View>
       )}
+
+      {/* Filter pills */}
+      <View style={styles.filterRow}>
+        {FILTERS.map(({ key, label }) => {
+          const active = filter === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.filterPill, active && styles.filterPillActive]}
+              onPress={() => { setFilter(key); setTopIndex(0); }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {warning && (
         <WarningToast message={warning} onDismiss={() => setWarning(null)} />
@@ -210,7 +265,7 @@ export default function FeedScreen() {
 
           {showStack && (
             <CardStack
-              cards={cards}
+              cards={filteredCards}
               topIndex={topIndex}
               onSwipeRight={handleSwipeRight}
               onSwipeLeft={handleSwipeLeft}
@@ -292,6 +347,34 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   counterOf: { color: Colors.mutedLight },
+
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.screenPad,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    backgroundColor: Colors.glass,
+  },
+  filterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterPillText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: Colors.muted,
+  },
+  filterPillTextActive: {
+    color: Colors.white,
+    fontFamily: Fonts.bodySemiBold,
+  },
 
   stackArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 

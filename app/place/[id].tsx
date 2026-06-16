@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { fetchPlaceDetails, PlaceDetail } from '@/lib/places';
 import { useCheckin, CheckinResult, CHECKIN_RADIUS_METERS, formatDistance } from '@/hooks/useCheckin';
+import { track } from '@/lib/analytics';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivacy } from '@/hooks/usePrivacy';
 import { CheckinSuccess } from '@/components/CheckinSuccess';
@@ -78,6 +79,7 @@ export default function PlaceDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
+    track('detail_open', { type: 'place', place_id: id });
     fetchPlaceDetails(id)
       .then(setPlace)
       .catch((e) => setError(e?.message ?? 'Failed to load'))
@@ -110,14 +112,16 @@ export default function PlaceDetailScreen() {
     try {
       await Share.share({
         title: place.name,
-        message: `Check out ${place.name} on Gedi!\nhttps://gediapp.in/place/${id}`,
+        message: `Check out ${place.name} on Gedi — Tera sheher. Teri gedi.\ngedi://place/${id}`,
         url: `gedi://place/${id}`,
       });
+      track('share', { type: 'place', place_id: id });
     } catch {}
   };
 
   const handleCheckin = () => {
     if (!place) return;
+    track('checkin', { place_id: id, place_name: place.name });
     checkin(id!, place.name, place.lat, place.lng);
   };
 

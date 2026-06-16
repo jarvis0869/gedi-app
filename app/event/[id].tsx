@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCachedEvent, cacheFeed } from '@/lib/eventCache';
 import { buildFeed } from '@/lib/feedMixer';
+import { track } from '@/lib/analytics';
 import { EventCard } from '@/lib/events';
 import { EventbriteCard } from '@/lib/eventbrite';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -48,6 +49,7 @@ export default function EventDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
+    track('detail_open', { type: 'event', event_id: id });
     const cached = getCachedEvent(id);
     if (cached && cached.type === 'event') {
       setEvent(cached as AnyEvent);
@@ -120,9 +122,10 @@ export default function EventDetailScreen() {
     try {
       await Share.share({
         title,
-        message: `Check out "${title}" on Gedi!\ngediapp.in/event/${id}`,
+        message: `Check out ${title} on Gedi — Tera sheher. Teri gedi.\ngedi://event/${id}`,
         url: `gedi://event/${id}`,
       });
+      track('share', { type: 'event', event_id: id });
     } catch {}
   };
 

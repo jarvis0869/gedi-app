@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivacy, PrivacyMode } from '@/hooks/usePrivacy';
@@ -28,7 +30,7 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifEnabled, setNotifEnabled] = useState(false);
   const { mode: privacyMode, setMode: setPrivacyMode } = usePrivacy(user?.id);
 
   useEffect(() => {
@@ -39,10 +41,51 @@ export default function ProfileScreen() {
       .eq('id', user.id)
       .single()
       .then(({ data }) => { if (data) setProfile(data as UserProfile); });
+    // Sync toggle to actual OS permission status
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setNotifEnabled(status === 'granted');
+    });
   }, [user]);
 
   const updatePrivacy = async (mode: PrivacyMode) => {
     await setPrivacyMode(mode);
+  };
+
+  const handleNotifToggle = async (value: boolean) => {
+    if (value) {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Gedi',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF6B00',
+        });
+      }
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        setNotifEnabled(true);
+        const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
+        if (tokenData?.data && user) {
+          await supabase.from('users').update({ push_token: tokenData.data }).eq('id', user.id);
+        }
+      } else {
+        setNotifEnabled(false);
+        // OS blocked — open settings so user can enable manually
+        Alert.alert(
+          'Notifications Blocked',
+          'Enable notifications for Gedi in your device Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
+      }
+    } else {
+      setNotifEnabled(false);
+      if (user) {
+        await supabase.from('users').update({ push_token: null }).eq('id', user.id);
+      }
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -127,7 +170,7 @@ export default function ProfileScreen() {
           </View>
           <Switch
             value={notifEnabled}
-            onValueChange={setNotifEnabled}
+            onValueChange={handleNotifToggle}
             thumbColor={Colors.white}
             trackColor={{ false: Colors.glassBorder, true: Colors.primary }}
           />

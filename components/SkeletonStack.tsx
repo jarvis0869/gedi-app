@@ -57,28 +57,24 @@ function ShimmerBar({
   );
 }
 
-function SkeletonSingle({ scale = 1, ty = 0, opacity = 1, delay = 0 }) {
-  const op = useSharedValue(opacity * 0.6);
+// Single full-screen shimmer card matching TikTok feed layout
+export function SkeletonStack() {
+  const op = useSharedValue(0.5);
   useEffect(() => {
-    op.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(opacity, { duration: 1000 }),
-          withTiming(opacity * 0.55, { duration: 1000 })
-        ),
-        -1,
-        false
-      )
+    op.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1000 }),
+        withTiming(0.5, { duration: 1000 })
+      ),
+      -1,
+      false
     );
   }, []);
-  const aStyle = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ scale }, { translateY: ty }],
-  }));
+  const cardStyle = useAnimatedStyle(() => ({ opacity: op.value }));
 
   return (
-    <Animated.View style={[styles.card, aStyle]}>
+    <Animated.View style={[styles.card, cardStyle]}>
+      {/* Image shimmer area */}
       <View style={styles.imageArea}>
         <LinearGradient
           colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.03)']}
@@ -87,44 +83,43 @@ function SkeletonSingle({ scale = 1, ty = 0, opacity = 1, delay = 0 }) {
           style={StyleSheet.absoluteFill}
         />
       </View>
+
+      {/* Content shimmer area */}
       <View style={styles.contentArea}>
-        <ShimmerBar w="62%" h={26} delay={delay} />
-        <ShimmerBar w="88%" h={12} mt={12} delay={delay + 80} />
-        <ShimmerBar w="48%" h={12} mt={7} delay={delay + 160} />
-        <View style={styles.hintRow}>
-          <ShimmerBar w={55} h={9} delay={delay + 240} />
-          <ShimmerBar w={55} h={9} delay={delay + 240} />
-          <ShimmerBar w={55} h={9} delay={delay + 240} />
+        {/* Open badge placeholder */}
+        <ShimmerBar w={72} h={22} delay={0} />
+        {/* Name */}
+        <ShimmerBar w="68%" h={30} mt={10} delay={80} />
+        {/* Meta row */}
+        <View style={styles.metaRow}>
+          <ShimmerBar w={60} h={12} delay={120} />
+          <ShimmerBar w={24} h={12} delay={120} />
+          <ShimmerBar w={80} h={12} delay={120} />
         </View>
+        {/* Vicinity */}
+        <ShimmerBar w="50%" h={12} mt={4} delay={160} />
+        {/* Hint row */}
+        <View style={styles.hintRow}>
+          <ShimmerBar w={55} h={9} delay={240} />
+          <ShimmerBar w={65} h={9} delay={240} />
+          <ShimmerBar w={55} h={9} delay={240} />
+        </View>
+      </View>
+
+      {/* Detail bar shimmer */}
+      <View style={styles.detailBar}>
+        <ShimmerBar w={100} h={13} delay={200} />
       </View>
     </Animated.View>
   );
 }
 
-export function SkeletonStack() {
-  return (
-    <View style={styles.stack}>
-      <SkeletonSingle scale={0.89} ty={-20} opacity={0.4} delay={200} />
-      <SkeletonSingle scale={0.945} ty={-10} opacity={0.65} delay={100} />
-      <SkeletonSingle scale={1} ty={0} opacity={1} delay={0} />
-    </View>
-  );
-}
-
-// Keep single export too for backwards compat
 export function SkeletonCard() {
-  return <SkeletonSingle />;
+  return <SkeletonStack />;
 }
 
 const styles = StyleSheet.create({
-  stack: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   card: {
-    position: 'absolute',
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: Radius.card,
@@ -135,15 +130,32 @@ const styles = StyleSheet.create({
   },
   imageArea: {
     width: '100%',
-    height: '63%',
+    height: '62%',
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   contentArea: {
     padding: 18,
+    gap: 5,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
   },
   hintRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 18,
+    marginTop: 16,
+  },
+  detailBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,107,0,0.06)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,107,0,0.12)',
   },
 });
