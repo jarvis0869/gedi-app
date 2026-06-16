@@ -4,15 +4,28 @@ import { fetchEventbriteEvents, EventbriteCard } from './eventbrite';
 
 export type FeedCard = PlaceCard | EventCard | EventbriteCard;
 
-// Deduplicate events by normalised title
+// Jaccard similarity on word sets
+function jaccardSimilarity(a: string, b: string): number {
+  const words = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean));
+  const wA = words(a);
+  const wB = words(b);
+  let intersection = 0;
+  for (const w of wA) if (wB.has(w)) intersection++;
+  const union = wA.size + wB.size - intersection;
+  return union === 0 ? 1 : intersection / union;
+}
+
+// Deduplicate events by title similarity — Jaccard >= 0.7 treated as same event
 function dedupeEvents(cards: (EventCard | EventbriteCard)[]): (EventCard | EventbriteCard)[] {
-  const seen = new Set<string>();
-  return cards.filter((c) => {
-    const key = c.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const result: (EventCard | EventbriteCard)[] = [];
+  for (const card of cards) {
+    const isDup = result.some(
+      (existing) => jaccardSimilarity(existing.title, card.title) >= 0.7
+    );
+    if (!isDup) result.push(card);
+  }
+  return result;
 }
 
 function parseEventDate(c: EventCard | EventbriteCard): number {
@@ -24,24 +37,15 @@ function parseEventDate(c: EventCard | EventbriteCard): number {
   return isNaN(ms) ? Infinity : ms;
 }
 
-// Interleave: no more than 2 places in a row before an event
+// 3 places : 2 events pattern = 60% places, 40% events
 function interleave(places: PlaceCard[], events: (EventCard | EventbriteCard)[]): FeedCard[] {
   const result: FeedCard[] = [];
   let pi = 0;
   let ei = 0;
-  let run = 0;
 
   while (pi < places.length || ei < events.length) {
-    if (run >= 2 && ei < events.length) {
-      result.push(events[ei++]);
-      run = 0;
-    } else if (pi < places.length) {
-      result.push(places[pi++]);
-      run++;
-    } else {
-      result.push(events[ei++]);
-      run = 0;
-    }
+    for (let i = 0; i < 3 && pi < places.length; i++) result.push(places[pi++]);
+    for (let i = 0; i < 2 && ei < events.length; i++) result.push(events[ei++]);
   }
 
   return result;
@@ -73,13 +77,13 @@ export async function buildFeed(): Promise<FeedResult> {
     ? ebResult.value
     : (errors.push({ source: 'Eventbrite', message: (ebResult.reason as Error)?.message }), []);
 
-  // Prefer Eventbrite events (richer data), then SerpAPI
+  // Prefer Eventbrite (richer data), then SerpAPI; dedupe by title similarity
   const allEvents = dedupeEvents([...ebEvents, ...serpEvents]);
 
-  // Sort events by soonest first, filter out past events
+  // Sort events soonest first, allow events up to 3 h past start
   const now = Date.now();
   const upcomingEvents = allEvents
-    .filter((e) => parseEventDate(e) >= now - 3 * 60 * 60 * 1000) // allow events up to 3h ago
+    .filter((e) => parseEventDate(e) >= now - 3 * 60 * 60 * 1000)
     .sort((a, b) => parseEventDate(a) - parseEventDate(b));
 
   const cards = interleave(places, upcomingEvents);

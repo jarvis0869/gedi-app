@@ -17,26 +17,13 @@ export interface EventCard {
   url?: string;
 }
 
-export async function fetchSerpEvents(): Promise<EventCard[]> {
-  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
-  if (!KEY) return [];
-
-  const query = encodeURIComponent('events in Hauz Khas Village Delhi this week');
-  const url = `https://serpapi.com/search.json?engine=google_events&q=${query}&hl=en&gl=in&api_key=${KEY}`;
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`SerpAPI HTTP ${res.status}`);
-  const json = await res.json();
-
-  if (json.error) throw new Error(`SerpAPI: ${json.error}`);
-
-  const raw: any[] = json.events_results ?? [];
-  const events: EventCard[] = raw
-    .filter((e) => e.title)
-    .map((e, i) => {
+function mapSerpResults(raw: any[], qIdx: number): EventCard[] {
+  return (raw ?? [])
+    .filter((e: any) => e.title)
+    .map((e: any, i: number) => {
       const slug = e.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
       return {
-        id: `serp-${i}-${slug}`,
+        id: `serp-${qIdx}-${i}-${slug}`,
         type: 'event' as const,
         source: 'serpapi' as const,
         title: e.title,
@@ -49,6 +36,36 @@ export async function fetchSerpEvents(): Promise<EventCard[]> {
         url: e.link ?? '',
       };
     });
+}
+
+async function serpFetch(query: string): Promise<any[]> {
+  const q = encodeURIComponent(query);
+  const res = await fetch(
+    `https://serpapi.com/search.json?engine=google_events&q=${q}&hl=en&gl=in&api_key=${KEY}`
+  );
+  if (!res.ok) throw new Error(`SerpAPI HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(`SerpAPI: ${json.error}`);
+  return json.events_results ?? [];
+}
+
+export async function fetchSerpEvents(): Promise<EventCard[]> {
+  if (cache && Date.now() - cache.ts < CACHE_TTL) return cache.data;
+  if (!KEY) return [];
+
+  const [r1, r2] = await Promise.allSettled([
+    serpFetch('events in Hauz Khas Village Delhi this week'),
+    serpFetch('things to do Hauz Khas Village Delhi this weekend'),
+  ]);
+
+  if (r1.status === 'rejected' && r2.status === 'rejected') {
+    throw new Error(`SerpAPI: ${(r1.reason as Error)?.message}`);
+  }
+
+  const events = [
+    ...mapSerpResults(r1.status === 'fulfilled' ? r1.value : [], 1),
+    ...mapSerpResults(r2.status === 'fulfilled' ? r2.value : [], 2),
+  ];
 
   cache = { data: events, ts: Date.now() };
   return events;

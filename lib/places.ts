@@ -75,7 +75,10 @@ export async function fetchNearbyPlaces(): Promise<PlaceCard[]> {
     return nearbyCache.data;
   }
 
-  const types = ['restaurant', 'bar', 'cafe'];
+  const types = [
+    'restaurant', 'bar', 'cafe',
+    'night_club', 'art_gallery', 'tourist_attraction', 'museum', 'park',
+  ];
   const results = await Promise.all(
     types.map((type) =>
       gFetch(
