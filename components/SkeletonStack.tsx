@@ -10,7 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius } from '@/constants/theme';
-import { CARD_WIDTH, CARD_HEIGHT } from '@/components/CardStack';
+
+const { width, height } = Dimensions.get('window');
+const CARD_WIDTH = width - 32;
+const CARD_HEIGHT = height * 0.72;
 
 function ShimmerBar({
   w = '100%' as number | string,

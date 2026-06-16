@@ -115,13 +115,10 @@ export default function FeedScreen() {
   }));
 
   const handleSwipeRight = useCallback(async (card: FeedCard) => {
-    setTopIndex((i) => i + 1);
     save(card).catch(() => {});
   }, [save]);
 
-  const handleSwipeLeft = useCallback(() => {
-    setTopIndex((i) => i + 1);
-  }, []);
+  const handleSwipeLeft = useCallback(() => {}, []);
 
   const handleSwipeUp = useCallback((card: FeedCard) => {
     if (card.type === 'place') {
@@ -132,8 +129,7 @@ export default function FeedScreen() {
   }, [router]);
 
   const isEmpty = !loading && !error && cards.length === 0;
-  const allSwiped = !loading && cards.length > 0 && topIndex >= cards.length;
-  const showStack = !loading && !error && !isEmpty && !allSwiped;
+  const showStack = !loading && !error && !isEmpty;
 
   return (
     <View style={styles.container}>
@@ -212,35 +208,16 @@ export default function FeedScreen() {
             </View>
           )}
 
-          {allSwiped && (
-            <View style={styles.centered}>
-              <Text style={styles.stateEmoji}>🎉</Text>
-              <Text style={styles.stateTitle}>You've seen it all!</Text>
-              <Text style={styles.stateSubtitle}>
-                New places and events tomorrow.{'\n'}Check Saved for your shortlist.
-              </Text>
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => { setTopIndex(0); load(true); }}
-              >
-                <Text style={styles.actionBtnText}>Start Over</Text>
-              </Pressable>
-            </View>
-          )}
-
           {showStack && (
-            <View style={styles.stackArea}>
-              <GlowBackground intensity="soft" yOffset={height * 0.46} />
-              <CardStack
-                cards={cards}
-                topIndex={topIndex}
-                onSwipeRight={handleSwipeRight}
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeUp={handleSwipeUp}
-                onRefresh={doRefresh}
-              />
-              <SwipeTutorial visible={showTutorial && topIndex === 0} />
-            </View>
+            <CardStack
+              cards={cards}
+              topIndex={topIndex}
+              onSwipeRight={handleSwipeRight}
+              onSwipeLeft={handleSwipeLeft}
+              onSwipeUp={handleSwipeUp}
+              onRefresh={doRefresh}
+              onIndexChange={(idx) => setTopIndex(idx)}
+            />
           )}
       </View>
     </View>
